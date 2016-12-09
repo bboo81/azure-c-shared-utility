@@ -10,7 +10,7 @@ extern "C" {
 
 typedef struct UWS_INSTANCE_TAG* UWS_HANDLE;
 
-extern UWS_HANDLE uws_create();
+extern UWS_HANDLE uws_create(void);
 extern void uws_destroy(UWS_HANDLE ws_io);
 
 #ifdef __cplusplus
