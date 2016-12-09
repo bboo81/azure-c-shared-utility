@@ -5,13 +5,39 @@
 #define UWS_H
 
 #ifdef __cplusplus
+#include <cstdbool>
 extern "C" {
+#else
+#include <stdbool.h>
 #endif
 
 typedef struct UWS_INSTANCE_TAG* UWS_HANDLE;
 
-extern UWS_HANDLE uws_create(void);
-extern void uws_destroy(UWS_HANDLE ws_io);
+#define WS_SEND_RESULT_VALUES \
+    WS_SEND_OK, \
+    WS_SEND_ERROR, \
+    WS_SEND_CANCELLED
+
+DEFINE_ENUM(WS_SEND_RESULT, WS_SEND_RESULT_VALUES);
+
+#define WS_OPEN_RESULT_VALUES \
+    WS_OPEN_OK, \
+    WS_OPEN_ERROR, \
+    WS_OPEN_CANCELLED
+
+DEFINE_ENUM(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
+
+typedef void(*ON_WS_FRAME_RECEIVED)(void* context, const unsigned char* buffer, size_t size);
+typedef void(*ON_WS_SEND_COMPLETE)(void* context, WS_SEND_RESULT send_result);
+typedef void(*ON_WS_OPEN_COMPLETE)(void* context, WS_OPEN_RESULT open_result);
+typedef void(*ON_WS_ERROR)(void* context);
+
+extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl);
+extern void uws_destroy(UWS_HANDLE uws);
+extern int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_uws_open_complete, ON_WS_FRAME_RECEIVED on_ws_frame_received, ON_WS_ERROR on_ws_error, void* callback_context);
+extern int uws_close(UWS_HANDLE uws);
+extern int uws_send(UWS_HANDLE uws, const unsigned char* buffer, size_t size, ON_WS_SEND_COMPLETE on_ws_send_complete, void* callback_context);
+extern void uws_dowork(UWS_HANDLE uws);
 
 #ifdef __cplusplus
 }
