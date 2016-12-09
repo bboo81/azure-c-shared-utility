@@ -26,23 +26,23 @@ extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_s
 ```
 
 **SRS_UWS_01_001: \[**`uws_create` shall create an instance of uws and return a non-NULL handle to it.**\]**
-If the argument `hostname` is NULL then `uws_create` shall return NULL.
-If allocating memory for the new uws instance fails then `uws_create` shall return NULL.
-The argument `hostname` shall be copied for later use (they are needed when the IO is opened).
-If `use_ssl` is 0 then `uws_create` shall obtain the interface used to create a socketio instance by calling `socketio_get_interface_description`.
-If `use_ssl` is 1 then `uws_create` shall obtain the interface used to create a tlsio instance by calling `platform_get_default_tlsio`.
-If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. 
-The obtained interface shall be used to create the IO used as underlying IO by the newly created uws instance.
-The underlying IO shall be created by calling `uws_create`.
-The create arguments for the socket IO (when `use_ssl` is 0) shall have:
-- `host` set to the `host` field in the `io_create_parameters` passed to `uws_create`.
-- `port` set to 80.
-The create arguments for the tls IO (when `use_ssl` is 1) shall have:
-- `host` set to the `host` field in the `io_create_parameters` passed to `uws_create`.
-- `port` set to 443.
-If `xio_create` fails, then `uws_create` shall fail and return NULL.
-`uws_create` shall create a pending send IO list that is to be used to queue send packets by calling `singlylinkedlist_create`.
-If `singlylinkedlist_create` fails then `uws_create` shall fail and return NULL.
+**SRS_UWS_01_002: [** If the argument `hostname` is NULL then `uws_create` shall return NULL. **]**
+**SRS_UWS_01_003: [** If allocating memory for the new uws instance fails then `uws_create` shall return NULL. **]**
+**SRS_UWS_01_004: [** The argument `hostname` shall be copied for later use (they are needed when the IO is opened). **]**
+**SRS_UWS_01_005: [** If `use_ssl` is 0 then `uws_create` shall obtain the interface used to create a socketio instance by calling `socketio_get_interface_description`. **]**
+**SRS_UWS_01_006: [** If `use_ssl` is 1 then `uws_create` shall obtain the interface used to create a tlsio instance by calling `platform_get_default_tlsio`. **]**
+**SRS_UWS_01_007: [** If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. **]** 
+**SRS_UWS_01_008: [** The obtained interface shall be used to create the IO used as underlying IO by the newly created uws instance. **]**
+**SRS_UWS_01_009: [** The underlying IO shall be created by calling `uws_create`. **]**
+**SRS_UWS_01_010: [** The create arguments for the socket IO (when `use_ssl` is 0) shall have: **]**
+**SRS_UWS_01_011: [** - `host` set to the `host` field in the `io_create_parameters` passed to `uws_create`. **]**
+**SRS_UWS_01_012: [** - `port` set to 80. **]**
+**SRS_UWS_01_013: [** The create arguments for the tls IO (when `use_ssl` is 1) shall have: **]**
+**SRS_UWS_01_014: [** - `host` set to the `host` field in the `io_create_parameters` passed to `uws_create`. **]**
+**SRS_UWS_01_015: [** - `port` set to 443. **]**
+**SRS_UWS_01_016: [** If `xio_create` fails, then `uws_create` shall fail and return NULL. **]**
+**SRS_UWS_01_017: [** `uws_create` shall create a pending send IO list that is to be used to queue send packets by calling `singlylinkedlist_create`. **]**
+**SRS_UWS_01_018: [** If `singlylinkedlist_create` fails then `uws_create` shall fail and return NULL. **]**
 
 ### uws_destroy
 
@@ -50,12 +50,12 @@ If `singlylinkedlist_create` fails then `uws_create` shall fail and return NULL.
 extern void uws_destroy(UWS_HANDLE uws);
 ```
 
-`uws_destroy` shall free all resources associated with the uws instance.
-If `uws` is NULL, `uws_destroy` shall do nothing. 
-`uws_destroy` shall perform a close action if the uws instance has already been open.
-`uws_destroy` shall execute a close action if an open is in progress.
-`uws_destroy` shall destroy the underlying IO created in `uws_create` by calling `xio_destroy`.
-`uws_destroy` shall free the list used to track the pending send IOs by calling `singlylinkedlist_destroy`.
+**SRS_UWS_01_019: [** `uws_destroy` shall free all resources associated with the uws instance. **]**
+**SRS_UWS_01_020: [** If `uws` is NULL, `uws_destroy` shall do nothing. **]** 
+**SRS_UWS_01_021: [** `uws_destroy` shall perform a close action if the uws instance has already been open. **]**
+**SRS_UWS_01_022: [** `uws_destroy` shall execute a close action if an open is in progress. **]**
+**SRS_UWS_01_023: [** `uws_destroy` shall destroy the underlying IO created in `uws_create` by calling `xio_destroy`. **]**
+**SRS_UWS_01_024: [** `uws_destroy` shall free the list used to track the pending sends by calling `singlylinkedlist_destroy`. **]**
 
 ### uws_open
 
@@ -63,10 +63,10 @@ If `uws` is NULL, `uws_destroy` shall do nothing.
 extern int uws_open(UWS_HANDLE uws, ON_UWS_OPEN_COMPLETE on_ws_open_complete, ON_WS_FRAME_RECEIVED on_ws_frame_received, ON_WS_ERROR on_ws_error, void* callback_context);
 ```
 
-`uws_open` shall open the underlying IO by calling `xio_open` and providing the IO handle created in `uws_create` as argument.
-On success, `uws_open` shall return 0.
-If `on_ws_open_complete` or `on_ws_error` is NULL, `uws_open` shall fail and return a non-zero value.
-If opening the underlyion IO fails then `uws_open` shall fail and return a non-zero value.
+**SRS_UWS_01_025: [** `uws_open` shall open the underlying IO by calling `xio_open` and providing the IO handle created in `uws_create` as argument. **]**
+**SRS_UWS_01_026: [** On success, `uws_open` shall return 0. **]**
+**SRS_UWS_01_027: [** If `on_ws_open_complete` or `on_ws_error` is NULL, `uws_open` shall fail and return a non-zero value. **]**
+**SRS_UWS_01_028: [** If opening the underlyion IO fails then `uws_open` shall fail and return a non-zero value. **]**
 
 ### uws_close
 
@@ -74,15 +74,15 @@ If opening the underlyion IO fails then `uws_open` shall fail and return a non-z
 extern int uws_close(UWS_HANDLE uws);
 ```
 
-`uws_close` shall close the uws instance connection if an open action is either pending or has completed successfully (if the IO is open). 
-if `uws` is NULL, `uws_close` shall return a non-zero value. 
-`uws_close` shall close the connection by calling `xio_close` while passing as argument the IO handle created in `uws_create`. 
-`uws_close` when no open action has been issued shall fail and return a non-zero value.
-`uws_close` after a `uws_close` shall fail and return a non-zero value. 
-`uws_close` shall obtain all the pending IO items by repetitively querying for the head of the pending IO list and freeing that head item.
-Obtaining the head of the pending IO list shall be done by calling `singlylinkedlist_get_head_item`.
-For each pending item the send complete callback shall be called with `UWS_SEND_CANCELLED`.
-The callback context passed to the `on_ws_send_complete` callback shall be the context given to `uws_send`. 
+**SRS_UWS_01_029: [** `uws_close` shall close the uws instance connection if an open action is either pending or has completed successfully (if the IO is open). **]** 
+**SRS_UWS_01_030: [** if `uws` is NULL, `uws_close` shall return a non-zero value. **]** 
+**SRS_UWS_01_031: [** `uws_close` shall close the connection by calling `xio_close` while passing as argument the IO handle created in `uws_create`. **]** 
+**SRS_UWS_01_032: [** `uws_close` when no open action has been issued shall fail and return a non-zero value. **]**
+**SRS_UWS_01_033: [** `uws_close` after a `uws_close` shall fail and return a non-zero value. **]** 
+**SRS_UWS_01_034: [** `uws_close` shall obtain all the pending IO items by repetitively querying for the head of the pending IO list and freeing that head item. **]**
+**SRS_UWS_01_035: [** Obtaining the head of the pending IO list shall be done by calling `singlylinkedlist_get_head_item`. **]**
+**SRS_UWS_01_036: [** For each pending item the send complete callback shall be called with `UWS_SEND_CANCELLED`. **]**
+**SRS_UWS_01_037: [** The callback context passed to the `on_ws_send_complete` callback shall be the context given to `uws_send`. **]** 
 
 ### uws_send
 
@@ -90,19 +90,19 @@ The callback context passed to the `on_ws_send_complete` callback shall be the c
 extern int uws_send(UWS_HANDLE uws, const unsigned char* buffer, size_t size, ON_WS_SEND_COMPLETE on_ws_send_complete, void* callback_context);
 ```
 
-`uws_send` shall create and queue a structure that contains:
-- the websocket frame containing the `size` bytes pointed by `buffer`, so that the frame can be later sent when `uws_dowork` is called
-- the send complete callback `on_ws_send_complete`
-- the send complete callback context `on_send_complete_context`
-On success, `uws_send` shall return 0.
-If the uws instance is not OPEN (open has not been called or is still in progress) then `uws_send` shall fail and return a non-zero value.
-If any of the arguments `uws` or `buffer` are NULL, `uws_send` shall fail and return a non-zero value.
-If `size` is zero then `uws_send` shall fail and return a non-zero value.
-`uws_send` shall allocate enough memory to hold the websocket frame that contains `size` bytes.
-If allocating memory for the newly queued item fails, `uws_send` shall fail and return a non-zero value.
-Queueing shall be done by calling `singlylinkedlist_add`.
-If `singlylinkedlist_add` fails, `uws_send` shall fail and return a non-zero value.
-The argument on_ws_send_complete shall be optional, if NULL is passed by the caller then no send complete callback shall be triggered.
+**SRS_UWS_01_038: [** `uws_send` shall create and queue a structure that contains: **]**
+**SRS_UWS_01_039: [** - the websocket frame containing the `size` bytes pointed by `buffer`, so that the frame can be later sent when `uws_dowork` is called **]**
+**SRS_UWS_01_040: [** - the send complete callback `on_ws_send_complete` **]**
+**SRS_UWS_01_041: [** - the send complete callback context `on_send_complete_context` **]**
+**SRS_UWS_01_042: [** On success, `uws_send` shall return 0. **]**
+**SRS_UWS_01_043: [** If the uws instance is not OPEN (open has not been called or is still in progress) then `uws_send` shall fail and return a non-zero value. **]**
+**SRS_UWS_01_044: [** If any of the arguments `uws` or `buffer` are NULL, `uws_send` shall fail and return a non-zero value. **]**
+**SRS_UWS_01_045: [** If `size` is zero then `uws_send` shall fail and return a non-zero value. **]**
+**SRS_UWS_01_046: [** `uws_send` shall allocate enough memory to hold the websocket frame that contains `size` bytes. **]**
+**SRS_UWS_01_047: [** If allocating memory for the newly queued item fails, `uws_send` shall fail and return a non-zero value. **]**
+**SRS_UWS_01_048: [** Queueing shall be done by calling `singlylinkedlist_add`. **]**
+**SRS_UWS_01_049: [** If `singlylinkedlist_add` fails, `uws_send` shall fail and return a non-zero value. **]**
+**SRS_UWS_01_050: [** The argument on_ws_send_complete shall be optional, if NULL is passed by the caller then no send complete callback shall be triggered. **]**
 
 ### uws_dowork
 
@@ -110,16 +110,16 @@ The argument on_ws_send_complete shall be optional, if NULL is passed by the cal
 extern void uws_dowork(UWS_HANDLE uws);
 ```
 
-`uws_dowork` shall iterate through all the pending sends and for each one of them:
-`uws_dowork` shall call `xio_send` to send the websocket frame with the following arguments:
-- the io handle shall be the underlyiong IO handle created in `uws_create`.
-- the `buffer` argument shall point to the complete websocket frame to be sent.
-- the `size` argument shall indicate the websocket frame length.
-- the `send_complete` callback shall be the `uws_send_complete` function.
-- the `send_complete_context` argument shall identify the pending send.
-If `xio_send` fails, `uws_dowork` shall indicate that by calling the `on_ws_send_complete` callback associated with the pending send with the `UWS_SEND_ERROR` code. 
-If the `uws` argument is NULL, `uws_dowork` shall do nothing.
-If the IO is not yet open, `uws_dowork` shall do nothing.
+**SRS_UWS_01_051: [** `uws_dowork` shall iterate through all the pending sends and for each one of them: **]**
+**SRS_UWS_01_052: [** `uws_dowork` shall call `xio_send` to send the websocket frame with the following arguments: **]**
+**SRS_UWS_01_053: [** - the io handle shall be the underlyiong IO handle created in `uws_create`. **]**
+**SRS_UWS_01_054: [** - the `buffer` argument shall point to the complete websocket frame to be sent. **]**
+**SRS_UWS_01_055: [** - the `size` argument shall indicate the websocket frame length. **]**
+**SRS_UWS_01_056: [** - the `send_complete` callback shall be the `uws_send_complete` function. **]**
+**SRS_UWS_01_057: [** - the `send_complete_context` argument shall identify the pending send. **]**
+**SRS_UWS_01_058: [** If `xio_send` fails, `uws_dowork` shall indicate that by calling the `on_ws_send_complete` callback associated with the pending send with the `UWS_SEND_ERROR` code. **]** 
+**SRS_UWS_01_059: [** If the `uws` argument is NULL, `uws_dowork` shall do nothing. **]**
+**SRS_UWS_01_060: [** If the IO is not yet open, `uws_dowork` shall do nothing. **]**
 
 ### on_underlying_io_error
 
@@ -162,7 +162,6 @@ If the IO is not yet open, `uws_dowork` shall do nothing.
    As with any URI scheme, the character "#", when not indicating the start of a fragment, MUST be escaped as %23.
 
 4.  Opening Handshake
-
 
 4.1.  Client Requirements
 
