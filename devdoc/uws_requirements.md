@@ -15,6 +15,8 @@ extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_s
 extern void uws_destroy(UWS_HANDLE uws);
 extern int uws_open(UWS_HANDLE uws, ON_UWS_OPEN_COMPLETE on_uws_open_complete, ON_WS_FRAME_RECEIVED on_ws_frame_received, ON_WS_IO_ERROR on_ws_io_error, void* callback_context);
 extern int uws_close(UWS_HANDLE uws);
+extern int uws_send(UWS_HANDLE uws, const unsigned char* buffer, size_t size, ON_WS_SEND_COMPLETE on_ws_send_complete, void* callback_context);
+extern void uws_dowork(UWS_HANDLE uws);
 ```
 
 ### uws_create
@@ -79,32 +81,32 @@ if `uws` is NULL, `uws_close` shall return a non-zero value.
 `uws_close` shall obtain all the pending IO items by repetitively querying for the head of the pending IO list and freeing that head item.
 Obtaining the head of the pending IO list shall be done by calling `singlylinkedlist_get_head_item`.
 For each pending item the send complete callback shall be called with `UWS_SEND_CANCELLED`.
-The callback context passed to the `on_send_complete` callback shall be the context given to `uws_send`. 
+The callback context passed to the `on_ws_send_complete` callback shall be the context given to `uws_send`. 
 
 ### uws_send
 
 ```c
-extern int uws_send(CONCRETE_IO_HANDLE ws_io, const void* buffer, size_t size, ON_SEND_COMPLETE on_send_complete, void* callback_context);
+extern int uws_send(UWS_HANDLE uws, const unsigned char* buffer, size_t size, ON_WS_SEND_COMPLETE on_ws_send_complete, void* callback_context);
 ```
 
 `uws_send` shall create and queue a structure that contains:
 - the websocket frame containing the `size` bytes pointed by `buffer`, so that the frame can be later sent when `uws_dowork` is called
-- the send complete callback `on_send_complete`
+- the send complete callback `on_ws_send_complete`
 - the send complete callback context `on_send_complete_context`
 On success, `uws_send` shall return 0.
 If the uws instance is not OPEN (open has not been called or is still in progress) then `uws_send` shall fail and return a non-zero value.
-If any of the arguments `ws_io` or `buffer` are NULL, `uws_send` shall fail and return a non-zero value.
+If any of the arguments `uws` or `buffer` are NULL, `uws_send` shall fail and return a non-zero value.
 If `size` is zero then `uws_send` shall fail and return a non-zero value.
 `uws_send` shall allocate enough memory to hold the websocket frame that contains `size` bytes.
 If allocating memory for the newly queued item fails, `uws_send` shall fail and return a non-zero value.
 Queueing shall be done by calling `singlylinkedlist_add`.
 If `singlylinkedlist_add` fails, `uws_send` shall fail and return a non-zero value.
-The argument on_send_complete shall be optional, if NULL is passed by the caller then no send complete callback shall be triggered.
+The argument on_ws_send_complete shall be optional, if NULL is passed by the caller then no send complete callback shall be triggered.
 
 ### uws_dowork
 
 ```c
-extern void uws_dowork(CONCRETE_IO_HANDLE uws);
+extern void uws_dowork(UWS_HANDLE uws);
 ```
 
 `uws_dowork` shall iterate through all the pending sends and for each one of them:
@@ -114,7 +116,7 @@ extern void uws_dowork(CONCRETE_IO_HANDLE uws);
 - the `size` argument shall indicate the websocket frame length.
 - the `send_complete` callback shall be the `uws_send_complete` function.
 - the `send_complete_context` argument shall identify the pending send.
-If `xio_send` fails, `uws_dowork` shall indicate that by calling the `on_send_complete` callback associated with the pending send with the `UWS_SEND_ERROR` code. 
+If `xio_send` fails, `uws_dowork` shall indicate that by calling the `on_ws_send_complete` callback associated with the pending send with the `UWS_SEND_ERROR` code. 
 If the `uws` argument is NULL, `uws_dowork` shall do nothing.
 If the IO is not yet open, `uws_dowork` shall do nothing.
 
