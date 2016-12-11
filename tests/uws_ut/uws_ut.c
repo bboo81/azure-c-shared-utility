@@ -340,7 +340,8 @@ TEST_FUNCTION(uws_create_with_valid_args_no_ssl_succeeds)
 	EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
     STRICT_EXPECTED_CALL(singlylinkedlist_create());
     STRICT_EXPECTED_CALL(socketio_get_interface_description());
-    STRICT_EXPECTED_CALL(xio_create(TEST_SOCKET_IO_INTERFACE_DESCRIPTION, &socketio_config));
+    STRICT_EXPECTED_CALL(xio_create(TEST_SOCKET_IO_INTERFACE_DESCRIPTION, &socketio_config))
+        .IgnoreArgument_io_create_parameters();
 
 	// act
     CONCRETE_IO_HANDLE uws = uws_create("test_host", 443, false);
