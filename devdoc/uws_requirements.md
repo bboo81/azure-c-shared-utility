@@ -62,7 +62,7 @@ XX**SRS_UWS_01_001: [**`uws_create` shall create an instance of uws and return a
 **SRS_UWS_01_014: [** - `host` set to the `host` field in the `io_create_parameters` passed to `uws_create`. **]**
 **SRS_UWS_01_015: [** - `port` set to 443. **]**
 **SRS_UWS_01_016: [** If `xio_create` fails, then `uws_create` shall fail and return NULL. **]**
-**SRS_UWS_01_017: [** `uws_create` shall create a pending send IO list that is to be used to queue send packets by calling `singlylinkedlist_create`. **]**
+XX**SRS_UWS_01_017: [** `uws_create` shall create a pending send IO list that is to be used to queue send packets by calling `singlylinkedlist_create`. **]**
 **SRS_UWS_01_018: [** If `singlylinkedlist_create` fails then `uws_create` shall fail and return NULL. **]**
 
 ### uws_destroy

@@ -10,6 +10,9 @@
 #include "azure_c_shared_utility/xlogging.h"
 #include "azure_c_shared_utility/xio.h"
 #include "azure_c_shared_utility/singlylinkedlist.h"
+#include "azure_c_shared_utility/socketio.h"
+#include "azure_c_shared_utility/platform.h"
+#include "azure_c_shared_utility/tlsio.h"
 
 typedef struct UWS_INSTANCE_TAG
 {
@@ -43,7 +46,47 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
         }
         else
         {
+            if (use_ssl == true)
+            {
+                TLSIO_CONFIG tlsio_config;
+                const IO_INTERFACE_DESCRIPTION* tlsio_interface = platform_get_default_tlsio();
+                if (tlsio_interface == NULL)
+                {
+                    LogError("NULL TLSIO interface description");
+                }
+                else
+                {
+                    tlsio_config.hostname = hostname;
+                    tlsio_config.port = port;
 
+                    result->underlying_io = xio_create(tlsio_interface, &tlsio_config);
+                }
+            }
+            else
+            {
+                SOCKETIO_CONFIG socketio_config;
+                const IO_INTERFACE_DESCRIPTION* socketio_interface = socketio_get_interface_description();
+                if (socketio_interface == NULL)
+                {
+                    LogError("NULL socketio interface description");
+                }
+                else
+                {
+                    socketio_config.hostname = hostname;
+                    socketio_config.port = port;
+                    socketio_config.accepted_socket = NULL;
+
+                    result->underlying_io = xio_create(socketio_interface, &socketio_config);
+                }
+            }
+
+            if (result->underlying_io == NULL)
+            {
+                LogError("Cannot create underlying IO.");
+                singlylinkedlist_destroy(result->pending_sends);
+                free(result);
+                result = NULL;
+            }
         }
     }
 

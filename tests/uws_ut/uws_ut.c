@@ -9,7 +9,6 @@
 #define ENABLE_MOCKS
 
 #include "azure_c_shared_utility/xio.h"
-#include "azure_c_shared_utility/optionhandler.h"
 #include "azure_c_shared_utility/shared_util_options.h"
 #include "azure_c_shared_utility/crt_abstractions.h"
 #include "azure_c_shared_utility/singlylinkedlist.h"
@@ -22,7 +21,8 @@ IMPLEMENT_UMOCK_C_ENUM_TYPE(IO_SEND_RESULT, IO_SEND_RESULT_VALUES);
 static const void** list_items = NULL;
 static size_t list_item_count = 0;
 static const SINGLYLINKEDLIST_HANDLE TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE = (SINGLYLINKEDLIST_HANDLE)0x4242;
-static const LIST_ITEM_HANDLE TEST_LIST_ITEM_HANDLE = (LIST_ITEM_HANDLE)0x11;
+static const LIST_ITEM_HANDLE TEST_LIST_ITEM_HANDLE = (LIST_ITEM_HANDLE)0x4243;
+static const XIO_HANDLE TEST_IO_HANDLE = (XIO_HANDLE)0x4244;
 
 static size_t currentmalloc_call;
 static size_t whenShallmalloc_fail;
@@ -131,10 +131,108 @@ LIST_ITEM_HANDLE my_singlylinkedlist_find(SINGLYLINKEDLIST_HANDLE handle, LIST_M
 }
 
 #include "azure_c_shared_utility/gballoc.h"
+#include "azure_c_shared_utility/socketio.h"
+#include "azure_c_shared_utility/platform.h"
 
 #undef ENABLE_MOCKS
 
 #include "azure_c_shared_utility/uws.h"
+
+static char* umocktypes_stringify_const_SOCKETIO_CONFIG_ptr(const SOCKETIO_CONFIG** value)
+{
+    char* result = NULL;
+    char temp_buffer[1024];
+    int length;
+    length = sprintf(temp_buffer, "{ hostname = %s, port = %d, accepted_socket = %p }",
+        (*value)->hostname,
+        (*value)->port,
+        (*value)->accepted_socket);
+
+    if (length > 0)
+    {
+        result = (char*)malloc(strlen(temp_buffer) + 1);
+        if (result != NULL)
+        {
+            (void)memcpy(result, temp_buffer, strlen(temp_buffer) + 1);
+        }
+    }
+
+    return result;
+}
+
+static int umocktypes_are_equal_const_SOCKETIO_CONFIG_ptr(const SOCKETIO_CONFIG** left, const SOCKETIO_CONFIG** right)
+{
+    int result;
+
+    if ((left == NULL) ||
+        (right == NULL))
+    {
+        result = -1;
+    }
+    else
+    {
+        result = ((*left)->port == (*right)->port);
+        result = result && ((*left)->accepted_socket == (*right)->accepted_socket);
+        if (strcmp((*left)->hostname, (*right)->hostname) != 0)
+        {
+            result = 0;
+        }
+    }
+
+    return result;
+}
+
+static char* copy_string(const char* source)
+{
+    char* result;
+
+    if (source == NULL)
+    {
+        result = NULL;
+    }
+    else
+    {
+        size_t length = strlen(source);
+        result = (char*)malloc(length + 1);
+        (void)memcpy(result, source, length + 1);
+    }
+
+    return result;
+}
+
+static int umocktypes_copy_const_SOCKETIO_CONFIG_ptr(SOCKETIO_CONFIG** destination, const SOCKETIO_CONFIG** source)
+{
+    int result;
+
+    *destination = (SOCKETIO_CONFIG*)malloc(sizeof(SOCKETIO_CONFIG));
+    if (*destination == NULL)
+    {
+        result = __LINE__;
+    }
+    else
+    {
+        if ((*source)->hostname == NULL)
+        {
+            (*destination)->hostname = NULL;
+        }
+        else
+        {
+            (*destination)->hostname = copy_string((*source)->hostname);
+            (*destination)->port = (*source)->port;
+            (*destination)->accepted_socket = (*source)->accepted_socket;
+        }
+
+        result = 0;
+    }
+
+    return result;
+}
+
+static void umocktypes_free_const_SOCKETIO_CONFIG_ptr(SOCKETIO_CONFIG** value)
+{
+    free((void*)(*value)->hostname);
+    free(*value);
+}
 
 // consumer mocks
 MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_open_complete, void*, context, WS_OPEN_RESULT, ws_open_result);
@@ -150,6 +248,9 @@ MOCK_FUNCTION_END()
 
 static TEST_MUTEX_HANDLE g_testByTest;
 static TEST_MUTEX_HANDLE g_dllByDll;
+
+static const IO_INTERFACE_DESCRIPTION* TEST_SOCKET_IO_INTERFACE_DESCRIPTION = (const IO_INTERFACE_DESCRIPTION*)0x4542;
+static const IO_INTERFACE_DESCRIPTION* TEST_TLS_IO_INTERFACE_DESCRIPTION = (const IO_INTERFACE_DESCRIPTION*)0x4543;
 
 DEFINE_ENUM_STRINGS(UMOCK_C_ERROR_CODE, UMOCK_C_ERROR_CODE_VALUES)
 
@@ -185,8 +286,12 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_add, my_singlylinkedlist_add);
     REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_item_get_value, my_singlylinkedlist_item_get_value);
     REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_find, my_singlylinkedlist_find);
+    REGISTER_GLOBAL_MOCK_RETURN(socketio_get_interface_description, TEST_SOCKET_IO_INTERFACE_DESCRIPTION);
+    REGISTER_GLOBAL_MOCK_RETURN(platform_get_default_tlsio, TEST_TLS_IO_INTERFACE_DESCRIPTION);
+    REGISTER_GLOBAL_MOCK_RETURN(xio_create, TEST_IO_HANDLE);
     REGISTER_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT);
     REGISTER_TYPE(IO_SEND_RESULT, IO_SEND_RESULT);
+    REGISTER_TYPE(const SOCKETIO_CONFIG*, const_SOCKETIO_CONFIG_ptr);
 
     REGISTER_UMOCK_ALIAS_TYPE(SINGLYLINKEDLIST_HANDLE, void*);
     REGISTER_UMOCK_ALIAS_TYPE(LIST_ITEM_HANDLE, void*);
@@ -223,11 +328,19 @@ TEST_FUNCTION_CLEANUP(method_cleanup)
 
 /* Tests_SRS_UWS_01_001: [`uws_create` shall create an instance of uws and return a non-NULL handle to it.]*/
 /* Tests_SRS_UWS_01_017: [ `uws_create` shall create a pending send IO list that is to be used to queue send packets by calling `singlylinkedlist_create`. ]*/
+/* Tests_SRS_UWS_01_005: [ If `use_ssl` is 0 then `uws_create` shall obtain the interface used to create a socketio instance by calling `socketio_get_interface_description`. ]*/
 TEST_FUNCTION(uws_create_with_valid_args_no_ssl_succeeds)
 {
 	// arrange
+    SOCKETIO_CONFIG socketio_config;
+    socketio_config.accepted_socket = NULL;
+    socketio_config.hostname = "test_host";
+    socketio_config.port = 443;
+
 	EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
     STRICT_EXPECTED_CALL(singlylinkedlist_create());
+    STRICT_EXPECTED_CALL(socketio_get_interface_description());
+    STRICT_EXPECTED_CALL(xio_create(TEST_SOCKET_IO_INTERFACE_DESCRIPTION, &socketio_config));
 
 	// act
     CONCRETE_IO_HANDLE uws = uws_create("test_host", 443, false);
