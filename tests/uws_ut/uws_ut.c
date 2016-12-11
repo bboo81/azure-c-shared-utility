@@ -300,6 +300,7 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_UMOCK_ALIAS_TYPE(SINGLYLINKEDLIST_HANDLE, void*);
     REGISTER_UMOCK_ALIAS_TYPE(LIST_ITEM_HANDLE, void*);
     REGISTER_UMOCK_ALIAS_TYPE(UWS_HANDLE, void*);
+    REGISTER_UMOCK_ALIAS_TYPE(XIO_HANDLE, void*);
 }
 
 TEST_SUITE_CLEANUP(suite_cleanup)
@@ -428,6 +429,54 @@ TEST_FUNCTION(when_allocating_memory_for_the_new_uws_instance_fails_then_uws_cre
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 }
 
+/* Tests_SRS_UWS_01_392: [ If allocating memory for the copy of the hostname argument fails, then `uws_create` shall return NULL. ]*/
+TEST_FUNCTION(when_allocating_memory_for_the_hostname_copy_fails_then_uws_create_fails)
+{
+    // arrange
+    SOCKETIO_CONFIG socketio_config;
+    socketio_config.accepted_socket = NULL;
+    socketio_config.hostname = "test_host";
+    socketio_config.port = 80;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
+        .IgnoreArgument_destination()
+        .SetReturn(1);
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    UWS_HANDLE uws = uws_create("test_host", 80, false);
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_018: [ If `singlylinkedlist_create` fails then `uws_create` shall fail and return NULL. ]*/
+TEST_FUNCTION(when_creating_the_pending_sends_list_fails_then_uws_create_fails)
+{
+    // arrange
+    SOCKETIO_CONFIG socketio_config;
+    socketio_config.accepted_socket = NULL;
+    socketio_config.hostname = "test_host";
+    socketio_config.port = 80;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(singlylinkedlist_create())
+        .SetReturn(NULL);
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    UWS_HANDLE uws = uws_create("test_host", 80, false);
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
 /* Tests_SRS_UWS_01_007: [ If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. ]*/
 TEST_FUNCTION(when_getting_the_socket_interface_description_fails_then_uws_create_fails)
 {
@@ -442,6 +491,35 @@ TEST_FUNCTION(when_getting_the_socket_interface_description_fails_then_uws_creat
         .IgnoreArgument_destination();
     STRICT_EXPECTED_CALL(singlylinkedlist_create());
     STRICT_EXPECTED_CALL(socketio_get_interface_description())
+        .SetReturn(NULL);
+    STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    UWS_HANDLE uws = uws_create("test_host", 80, false);
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_016: [ If `xio_create` fails, then `uws_create` shall fail and return NULL. ]*/
+TEST_FUNCTION(when_creating_the_io_handle_fails_then_uws_create_fails)
+{
+    // arrange
+    SOCKETIO_CONFIG socketio_config;
+    socketio_config.accepted_socket = NULL;
+    socketio_config.hostname = "test_host";
+    socketio_config.port = 80;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(singlylinkedlist_create());
+    STRICT_EXPECTED_CALL(socketio_get_interface_description());
+    STRICT_EXPECTED_CALL(xio_create(TEST_SOCKET_IO_INTERFACE_DESCRIPTION, &socketio_config))
+        .IgnoreArgument_io_create_parameters()
         .SetReturn(NULL);
     STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));

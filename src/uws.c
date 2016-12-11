@@ -46,6 +46,7 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
             /* Codes_SRS_UWS_01_004: [ The argument `hostname` shall be copied for later use. ]*/
             if (mallocAndStrcpy_s(&result->hostname, hostname) != 0)
             {
+                /* Codes_SRS_UWS_01_392: [ If allocating memory for the copy of the hostname argument fails, then `uws_create` shall return NULL. ]*/
                 LogError("Could not copy hostname.");
                 free(result);
                 result = NULL;
@@ -56,6 +57,7 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
                 result->pending_sends = singlylinkedlist_create();
                 if (result->pending_sends == NULL)
                 {
+                    /* Codes_SRS_UWS_01_018: [ If `singlylinkedlist_create` fails then `uws_create` shall fail and return NULL. ]*/
                     LogError("Could not allocate pending send frames list");
                     free(result->hostname);
                     free(result);
@@ -78,6 +80,10 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
                             tlsio_config.port = port;
 
                             result->underlying_io = xio_create(tlsio_interface, &tlsio_config);
+                            if (result->underlying_io == NULL)
+                            {
+                                LogError("Cannot create underlying TLS IO.");
+                            }
                         }
                     }
                     else
@@ -103,12 +109,16 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
                             /* Codes_SRS_UWS_01_008: [ The obtained interface shall be used to create the IO used as underlying IO by the newly created uws instance. ]*/
                             /* Codes_SRS_UWS_01_009: [ The underlying IO shall be created by calling `xio_create`. ]*/
                             result->underlying_io = xio_create(socketio_interface, &socketio_config);
+                            if (result->underlying_io == NULL)
+                            {
+                                LogError("Cannot create underlying socket IO.");
+                            }
                         }
                     }
 
                     if (result->underlying_io == NULL)
                     {
-                        LogError("Cannot create underlying IO.");
+                        /* Tests_SRS_UWS_01_016: [ If `xio_create` fails, then `uws_create` shall fail and return NULL. ]*/
                         singlylinkedlist_destroy(result->pending_sends);
                         free(result->hostname);
                         free(result);
