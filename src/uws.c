@@ -70,6 +70,7 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
                         if (tlsio_interface == NULL)
                         {
                             LogError("NULL TLSIO interface description");
+                            result->underlying_io = NULL;
                         }
                         else
                         {
@@ -86,7 +87,9 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
                         const IO_INTERFACE_DESCRIPTION* socketio_interface = socketio_get_interface_description();
                         if (socketio_interface == NULL)
                         {
+                            /* Codes_SRS_UWS_01_007: [ If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. ]*/
                             LogError("NULL socketio interface description");
+                            result->underlying_io = NULL;
                         }
                         else
                         {

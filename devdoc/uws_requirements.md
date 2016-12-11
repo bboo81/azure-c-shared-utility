@@ -49,7 +49,7 @@ extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_s
 XX**SRS_UWS_01_001: [**`uws_create` shall create an instance of uws and return a non-NULL handle to it.**]**
 XX**SRS_UWS_01_002: [** If the argument `hostname` is NULL then `uws_create` shall return NULL. **]**
 XX**SRS_UWS_01_003: [** If allocating memory for the new uws instance fails then `uws_create` shall return NULL. **]**
-**SRS_UWS_01_004: [** The argument `hostname` shall be copied for later use. **]**
+XX**SRS_UWS_01_004: [** The argument `hostname` shall be copied for later use. **]**
 XX**SRS_UWS_01_005: [** If `use_ssl` is 0 then `uws_create` shall obtain the interface used to create a socketio instance by calling `socketio_get_interface_description`. **]**
 **SRS_UWS_01_006: [** If `use_ssl` is 1 then `uws_create` shall obtain the interface used to create a tlsio instance by calling `platform_get_default_tlsio`. **]**
 **SRS_UWS_01_007: [** If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. **]** 

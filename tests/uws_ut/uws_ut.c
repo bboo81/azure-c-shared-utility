@@ -428,4 +428,31 @@ TEST_FUNCTION(when_allocating_memory_for_the_new_uws_instance_fails_then_uws_cre
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 }
 
+/* Tests_SRS_UWS_01_007: [ If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. ]*/
+TEST_FUNCTION(when_getting_the_socket_interface_description_fails_then_uws_create_fails)
+{
+    // arrange
+    SOCKETIO_CONFIG socketio_config;
+    socketio_config.accepted_socket = NULL;
+    socketio_config.hostname = "test_host";
+    socketio_config.port = 80;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(singlylinkedlist_create());
+    STRICT_EXPECTED_CALL(socketio_get_interface_description())
+        .SetReturn(NULL);
+    STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    UWS_HANDLE uws = uws_create("test_host", 80, false);
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
 END_TEST_SUITE(uws_ut)
