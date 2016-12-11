@@ -6,6 +6,10 @@
 #include "umocktypes_charptr.h"
 #include "umocktypes_bool.h"
 
+/* TODO:
+- Implement a feature in umock_c that can say "compare this argument as a given type"
+*/
+
 #define ENABLE_MOCKS
 
 #include "azure_c_shared_utility/xio.h"
@@ -295,6 +299,7 @@ TEST_SUITE_INITIALIZE(suite_init)
 
     REGISTER_UMOCK_ALIAS_TYPE(SINGLYLINKEDLIST_HANDLE, void*);
     REGISTER_UMOCK_ALIAS_TYPE(LIST_ITEM_HANDLE, void*);
+    REGISTER_UMOCK_ALIAS_TYPE(UWS_HANDLE, void*);
 }
 
 TEST_SUITE_CLEANUP(suite_cleanup)
@@ -329,22 +334,30 @@ TEST_FUNCTION_CLEANUP(method_cleanup)
 /* Tests_SRS_UWS_01_001: [`uws_create` shall create an instance of uws and return a non-NULL handle to it.]*/
 /* Tests_SRS_UWS_01_017: [ `uws_create` shall create a pending send IO list that is to be used to queue send packets by calling `singlylinkedlist_create`. ]*/
 /* Tests_SRS_UWS_01_005: [ If `use_ssl` is 0 then `uws_create` shall obtain the interface used to create a socketio instance by calling `socketio_get_interface_description`. ]*/
+/* Tests_SRS_UWS_01_008: [ The obtained interface shall be used to create the IO used as underlying IO by the newly created uws instance. ]*/
+/* Tests_SRS_UWS_01_009: [ The underlying IO shall be created by calling `xio_create`. ]*/
+/* Tests_SRS_UWS_01_010: [ The create arguments for the socket IO (when `use_ssl` is 0) shall have: ]*/
+/* Tests_SRS_UWS_01_011: [ - `hostname` set to the `hostname` argument passed to `uws_create`. ]*/
+/* Tests_SRS_UWS_01_012: [ - `port` set to the `port` argument passed to `uws_create`. ]*/
+/* Tests_SRS_UWS_01_004: [ The argument `hostname` shall be copied for later use. ]*/
 TEST_FUNCTION(uws_create_with_valid_args_no_ssl_succeeds)
 {
 	// arrange
     SOCKETIO_CONFIG socketio_config;
     socketio_config.accepted_socket = NULL;
     socketio_config.hostname = "test_host";
-    socketio_config.port = 443;
+    socketio_config.port = 80;
 
 	EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
+        .IgnoreArgument_destination();
     STRICT_EXPECTED_CALL(singlylinkedlist_create());
     STRICT_EXPECTED_CALL(socketio_get_interface_description());
     STRICT_EXPECTED_CALL(xio_create(TEST_SOCKET_IO_INTERFACE_DESCRIPTION, &socketio_config))
         .IgnoreArgument_io_create_parameters();
 
 	// act
-    CONCRETE_IO_HANDLE uws = uws_create("test_host", 443, false);
+    UWS_HANDLE uws = uws_create("test_host", 80, false);
 
 	// assert
 	ASSERT_IS_NOT_NULL(uws);
@@ -352,6 +365,67 @@ TEST_FUNCTION(uws_create_with_valid_args_no_ssl_succeeds)
 
     // cleanup
     uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_002: [ If the argument `hostname` is NULL then `uws_create` shall return NULL. ]*/
+TEST_FUNCTION(uws_create_with_NULL_hostname_fails)
+{
+    // arrange
+
+    // act
+    UWS_HANDLE uws = uws_create(NULL, 80, false);
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_012: [ - `port` set to the `port` argument passed to `uws_create`. ]*/
+TEST_FUNCTION(uws_create_with_valid_args_no_ssl_port_different_than_80_succeeds)
+{
+    // arrange
+    SOCKETIO_CONFIG socketio_config;
+    socketio_config.accepted_socket = NULL;
+    socketio_config.hostname = "test_host";
+    socketio_config.port = 81;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(singlylinkedlist_create());
+    STRICT_EXPECTED_CALL(socketio_get_interface_description());
+    STRICT_EXPECTED_CALL(xio_create(TEST_SOCKET_IO_INTERFACE_DESCRIPTION, &socketio_config))
+        .IgnoreArgument_io_create_parameters();
+
+    // act
+    UWS_HANDLE uws = uws_create("test_host", 81, false);
+
+    // assert
+    ASSERT_IS_NOT_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_003: [ If allocating memory for the new uws instance fails then `uws_create` shall return NULL. ]*/
+TEST_FUNCTION(when_allocating_memory_for_the_new_uws_instance_fails_then_uws_create_fails)
+{
+    // arrange
+    SOCKETIO_CONFIG socketio_config;
+    socketio_config.accepted_socket = NULL;
+    socketio_config.hostname = "test_host";
+    socketio_config.port = 80;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG))
+        .SetReturn(NULL);
+
+    // act
+    UWS_HANDLE uws = uws_create("test_host", 80, false);
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 }
 
 END_TEST_SUITE(uws_ut)

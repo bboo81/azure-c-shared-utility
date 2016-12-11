@@ -13,79 +13,105 @@
 #include "azure_c_shared_utility/socketio.h"
 #include "azure_c_shared_utility/platform.h"
 #include "azure_c_shared_utility/tlsio.h"
+#include "azure_c_shared_utility/crt_abstractions.h"
 
 typedef struct UWS_INSTANCE_TAG
 {
     SINGLYLINKEDLIST_HANDLE pending_sends;
     XIO_HANDLE underlying_io;
+    char* hostname;
 } UWS_INSTANCE;
 
 UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
 {
     UWS_HANDLE result;
 
-    (void)hostname;
-    (void)port;
-    (void)use_ssl;
-
-    /* Codes_SRS_UWS_01_001: [`uws_create` shall create an instance of uws and return a non-NULL handle to it.]*/
-    result = malloc(sizeof(UWS_INSTANCE));
-    if (result == NULL)
+    /* Codes_SRS_UWS_01_002: [ If the argument `hostname` is NULL then `uws_create` shall return NULL. ]*/
+    if (hostname == NULL)
     {
-        LogError("Could not allocate uWS instance");
+        LogError("NULL hostname");
+        result = NULL;
     }
     else
     {
-        /* Codes_SRS_UWS_01_017: [ `uws_create` shall create a pending send IO list that is to be used to queue send packets by calling `singlylinkedlist_create`. ]*/
-        result->pending_sends = singlylinkedlist_create();
-        if (result->pending_sends == NULL)
+        /* Codes_SRS_UWS_01_001: [`uws_create` shall create an instance of uws and return a non-NULL handle to it.]*/
+        result = malloc(sizeof(UWS_INSTANCE));
+        if (result == NULL)
         {
-            LogError("Could not allocate pending send frames list");
-            free(result);
-            result = NULL;
+            /* Codes_SRS_UWS_01_003: [ If allocating memory for the new uws instance fails then `uws_create` shall return NULL. ]*/
+            LogError("Could not allocate uWS instance");
         }
         else
         {
-            if (use_ssl == true)
+            /* Codes_SRS_UWS_01_004: [ The argument `hostname` shall be copied for later use. ]*/
+            if (mallocAndStrcpy_s(&result->hostname, hostname) != 0)
             {
-                TLSIO_CONFIG tlsio_config;
-                const IO_INTERFACE_DESCRIPTION* tlsio_interface = platform_get_default_tlsio();
-                if (tlsio_interface == NULL)
-                {
-                    LogError("NULL TLSIO interface description");
-                }
-                else
-                {
-                    tlsio_config.hostname = hostname;
-                    tlsio_config.port = port;
-
-                    result->underlying_io = xio_create(tlsio_interface, &tlsio_config);
-                }
+                LogError("Could not copy hostname.");
+                free(result);
+                result = NULL;
             }
             else
             {
-                SOCKETIO_CONFIG socketio_config;
-                const IO_INTERFACE_DESCRIPTION* socketio_interface = socketio_get_interface_description();
-                if (socketio_interface == NULL)
+                /* Codes_SRS_UWS_01_017: [ `uws_create` shall create a pending send IO list that is to be used to queue send packets by calling `singlylinkedlist_create`. ]*/
+                result->pending_sends = singlylinkedlist_create();
+                if (result->pending_sends == NULL)
                 {
-                    LogError("NULL socketio interface description");
+                    LogError("Could not allocate pending send frames list");
+                    free(result->hostname);
+                    free(result);
+                    result = NULL;
                 }
                 else
                 {
-                    socketio_config.hostname = hostname;
-                    socketio_config.port = port;
-                    socketio_config.accepted_socket = NULL;
+                    if (use_ssl == true)
+                    {
+                        TLSIO_CONFIG tlsio_config;
+                        const IO_INTERFACE_DESCRIPTION* tlsio_interface = platform_get_default_tlsio();
+                        if (tlsio_interface == NULL)
+                        {
+                            LogError("NULL TLSIO interface description");
+                        }
+                        else
+                        {
+                            tlsio_config.hostname = hostname;
+                            tlsio_config.port = port;
 
-                    result->underlying_io = xio_create(socketio_interface, &socketio_config);
+                            result->underlying_io = xio_create(tlsio_interface, &tlsio_config);
+                        }
+                    }
+                    else
+                    {
+                        SOCKETIO_CONFIG socketio_config;
+                        /* Codes_SRS_UWS_01_005: [ If `use_ssl` is 0 then `uws_create` shall obtain the interface used to create a socketio instance by calling `socketio_get_interface_description`. ]*/
+                        const IO_INTERFACE_DESCRIPTION* socketio_interface = socketio_get_interface_description();
+                        if (socketio_interface == NULL)
+                        {
+                            LogError("NULL socketio interface description");
+                        }
+                        else
+                        {
+                            /* Codes_SRS_UWS_01_010: [ The create arguments for the socket IO (when `use_ssl` is 0) shall have: ]*/
+                            /* Codes_SRS_UWS_01_011: [ - `hostname` set to the `hostname` argument passed to `uws_create`. ]*/
+                            /* Codes_SRS_UWS_01_012: [ - `port` set to the `port` argument passed to `uws_create`. ]*/
+                            socketio_config.hostname = hostname;
+                            socketio_config.port = port;
+                            socketio_config.accepted_socket = NULL;
+
+                            /* Codes_SRS_UWS_01_008: [ The obtained interface shall be used to create the IO used as underlying IO by the newly created uws instance. ]*/
+                            /* Codes_SRS_UWS_01_009: [ The underlying IO shall be created by calling `xio_create`. ]*/
+                            result->underlying_io = xio_create(socketio_interface, &socketio_config);
+                        }
+                    }
+
+                    if (result->underlying_io == NULL)
+                    {
+                        LogError("Cannot create underlying IO.");
+                        singlylinkedlist_destroy(result->pending_sends);
+                        free(result->hostname);
+                        free(result);
+                        result = NULL;
+                    }
                 }
-            }
-
-            if (result->underlying_io == NULL)
-            {
-                LogError("Cannot create underlying IO.");
-                singlylinkedlist_destroy(result->pending_sends);
-                free(result);
-                result = NULL;
             }
         }
     }

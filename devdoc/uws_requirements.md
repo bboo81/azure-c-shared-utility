@@ -47,20 +47,20 @@ extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_s
 ```
 
 XX**SRS_UWS_01_001: [**`uws_create` shall create an instance of uws and return a non-NULL handle to it.**]**
-**SRS_UWS_01_002: [** If the argument `hostname` is NULL then `uws_create` shall return NULL. **]**
-**SRS_UWS_01_003: [** If allocating memory for the new uws instance fails then `uws_create` shall return NULL. **]**
-**SRS_UWS_01_004: [** The argument `hostname` shall be copied for later use (they are needed when the IO is opened). **]**
-**SRS_UWS_01_005: [** If `use_ssl` is 0 then `uws_create` shall obtain the interface used to create a socketio instance by calling `socketio_get_interface_description`. **]**
+XX**SRS_UWS_01_002: [** If the argument `hostname` is NULL then `uws_create` shall return NULL. **]**
+XX**SRS_UWS_01_003: [** If allocating memory for the new uws instance fails then `uws_create` shall return NULL. **]**
+**SRS_UWS_01_004: [** The argument `hostname` shall be copied for later use. **]**
+XX**SRS_UWS_01_005: [** If `use_ssl` is 0 then `uws_create` shall obtain the interface used to create a socketio instance by calling `socketio_get_interface_description`. **]**
 **SRS_UWS_01_006: [** If `use_ssl` is 1 then `uws_create` shall obtain the interface used to create a tlsio instance by calling `platform_get_default_tlsio`. **]**
 **SRS_UWS_01_007: [** If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. **]** 
-**SRS_UWS_01_008: [** The obtained interface shall be used to create the IO used as underlying IO by the newly created uws instance. **]**
-**SRS_UWS_01_009: [** The underlying IO shall be created by calling `xio_create`. **]**
-**SRS_UWS_01_010: [** The create arguments for the socket IO (when `use_ssl` is 0) shall have: **]**
-**SRS_UWS_01_011: [** - `host` set to the `host` field in the `io_create_parameters` passed to `uws_create`. **]**
-**SRS_UWS_01_012: [** - `port` set to 80. **]**
+XX**SRS_UWS_01_008: [** The obtained interface shall be used to create the IO used as underlying IO by the newly created uws instance. **]**
+XX**SRS_UWS_01_009: [** The underlying IO shall be created by calling `xio_create`. **]**
+XX**SRS_UWS_01_010: [** The create arguments for the socket IO (when `use_ssl` is 0) shall have: **]**
+XX**SRS_UWS_01_011: [** - `hostname` set to the `hostname` argument passed to `uws_create`. **]**
+XX**SRS_UWS_01_012: [** - `port` set to the `port` argument passed to `uws_create`. **]**
 **SRS_UWS_01_013: [** The create arguments for the tls IO (when `use_ssl` is 1) shall have: **]**
-**SRS_UWS_01_014: [** - `host` set to the `host` field in the `io_create_parameters` passed to `uws_create`. **]**
-**SRS_UWS_01_015: [** - `port` set to 443. **]**
+**SRS_UWS_01_014: [** - `hostname` set to the `hostname` argument passed to `uws_create`. **]**
+**SRS_UWS_01_015: [** - `port` set to the `port` argument passed to `uws_create`. **]**
 **SRS_UWS_01_016: [** If `xio_create` fails, then `uws_create` shall fail and return NULL. **]**
 XX**SRS_UWS_01_017: [** `uws_create` shall create a pending send IO list that is to be used to queue send packets by calling `singlylinkedlist_create`. **]**
 **SRS_UWS_01_018: [** If `singlylinkedlist_create` fails then `uws_create` shall fail and return NULL. **]**
