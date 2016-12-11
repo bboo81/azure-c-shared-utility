@@ -16,6 +16,7 @@
 #include "azure_c_shared_utility/shared_util_options.h"
 #include "azure_c_shared_utility/crt_abstractions.h"
 #include "azure_c_shared_utility/singlylinkedlist.h"
+#include "azure_c_shared_utility/tlsio.h"
 
 TEST_DEFINE_ENUM_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT_VALUES);
 IMPLEMENT_UMOCK_C_ENUM_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT_VALUES);
@@ -527,6 +528,92 @@ TEST_FUNCTION(when_creating_the_io_handle_fails_then_uws_create_fails)
 
     // act
     UWS_HANDLE uws = uws_create("test_host", 80, false);
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_006: [ If `use_ssl` is 1 then `uws_create` shall obtain the interface used to create a tlsio instance by calling `platform_get_default_tlsio`. ]*/
+/* Tests_SRS_UWS_01_013: [ The create arguments for the tls IO (when `use_ssl` is 1) shall have: ]*/
+/* Tests_SRS_UWS_01_014: [ - `hostname` set to the `hostname` argument passed to `uws_create`. ]*/
+/* Tests_SRS_UWS_01_015: [ - `port` set to the `port` argument passed to `uws_create`. ]*/
+TEST_FUNCTION(uws_create_with_valid_args_ssl_succeeds)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 443;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(singlylinkedlist_create());
+    STRICT_EXPECTED_CALL(platform_get_default_tlsio());
+    STRICT_EXPECTED_CALL(xio_create(TEST_TLS_IO_INTERFACE_DESCRIPTION, &tlsio_config))
+        .IgnoreArgument_io_create_parameters();
+
+    // act
+    UWS_HANDLE uws = uws_create("test_host", 443, true);
+
+    // assert
+    ASSERT_IS_NOT_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_006: [ If `use_ssl` is 1 then `uws_create` shall obtain the interface used to create a tlsio instance by calling `platform_get_default_tlsio`. ]*/
+/* Tests_SRS_UWS_01_013: [ The create arguments for the tls IO (when `use_ssl` is 1) shall have: ]*/
+/* Tests_SRS_UWS_01_014: [ - `hostname` set to the `hostname` argument passed to `uws_create`. ]*/
+/* Tests_SRS_UWS_01_015: [ - `port` set to the `port` argument passed to `uws_create`. ]*/
+TEST_FUNCTION(uws_create_with_valid_args_ssl_port_different_than_443_succeeds)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(singlylinkedlist_create());
+    STRICT_EXPECTED_CALL(platform_get_default_tlsio());
+    STRICT_EXPECTED_CALL(xio_create(TEST_TLS_IO_INTERFACE_DESCRIPTION, &tlsio_config))
+        .IgnoreArgument_io_create_parameters();
+
+    // act
+    UWS_HANDLE uws = uws_create("test_host", 444, true);
+
+    // assert
+    ASSERT_IS_NOT_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_007: [ If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. ]*/
+TEST_FUNCTION(when_getting_the_tlsio_interface_fails_then_uws_create_fails)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(singlylinkedlist_create());
+    STRICT_EXPECTED_CALL(platform_get_default_tlsio())
+        .SetReturn(NULL);
+    STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    UWS_HANDLE uws = uws_create("test_host", 444, true);
 
     // assert
     ASSERT_IS_NULL(uws);

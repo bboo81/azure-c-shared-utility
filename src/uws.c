@@ -68,14 +68,19 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
                     if (use_ssl == true)
                     {
                         TLSIO_CONFIG tlsio_config;
+                        /* Codes_SRS_UWS_01_006: [ If `use_ssl` is 1 then `uws_create` shall obtain the interface used to create a tlsio instance by calling `platform_get_default_tlsio`. ]*/
                         const IO_INTERFACE_DESCRIPTION* tlsio_interface = platform_get_default_tlsio();
                         if (tlsio_interface == NULL)
                         {
+                            /* Codes_SRS_UWS_01_007: [ If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. ]*/
                             LogError("NULL TLSIO interface description");
                             result->underlying_io = NULL;
                         }
                         else
                         {
+                            /* Codes_SRS_UWS_01_013: [ The create arguments for the tls IO (when `use_ssl` is 1) shall have: ]*/
+                            /* Codes_SRS_UWS_01_014: [ - `hostname` set to the `hostname` argument passed to `uws_create`. ]*/
+                            /* Codes_SRS_UWS_01_015: [ - `port` set to the `port` argument passed to `uws_create`. ]*/
                             tlsio_config.hostname = hostname;
                             tlsio_config.port = port;
 
