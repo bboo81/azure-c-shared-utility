@@ -30,12 +30,13 @@ DEFINE_ENUM(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
 typedef void(*ON_WS_FRAME_RECEIVED)(void* context, const unsigned char* buffer, size_t size);
 typedef void(*ON_WS_SEND_FRAME_COMPLETE)(void* context, WS_SEND_FRAME_RESULT ws_send_frame_result);
 typedef void(*ON_WS_OPEN_COMPLETE)(void* context, WS_OPEN_RESULT ws_open_result);
+typedef void(*ON_WS_CLOSE_COMPLETE)(void* context);
 typedef void(*ON_WS_ERROR)(void* context);
 
 extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl);
 extern void uws_destroy(UWS_HANDLE uws);
 extern int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_ws_open_complete_context, ON_WS_FRAME_RECEIVED on_ws_frame_received, void* on_ws_frame_received_context, ON_WS_ERROR on_ws_error, void* on_ws_error_context);
-extern int uws_close(UWS_HANDLE uws);
+extern int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* on_ws_close_complete_context);
 extern int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* callback_context);
 extern void uws_dowork(UWS_HANDLE uws);
 ```
@@ -96,19 +97,19 @@ XX**SRS_UWS_01_394: [** `uws_open` while the uws instance is already OPEN or OPE
 ### uws_close
 
 ```c
-extern int uws_close(UWS_HANDLE uws);
+extern int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* on_ws_close_complete_context);
 ```
 
-**SRS_UWS_01_029: [** `uws_close` shall close the uws instance connection if an open action is either pending or has completed successfully (if the IO is open). **]** 
+XX**SRS_UWS_01_029: [** `uws_close` shall close the uws instance connection if an open action is either pending or has completed successfully (if the IO is open). **]** 
 **SRS_UWS_01_030: [** if `uws` is NULL, `uws_close` shall return a non-zero value. **]** 
-**SRS_UWS_01_031: [** `uws_close` shall close the connection by calling `xio_close` while passing as argument the IO handle created in `uws_create`. **]**
-**SRS_UWS_01_368: [** The callback `on_underlying_io_close` shall be passed as argument to `xio_close`. **]**
+XX**SRS_UWS_01_031: [** `uws_close` shall close the connection by calling `xio_close` while passing as argument the IO handle created in `uws_create`. **]**
+XX**SRS_UWS_01_368: [** The callback `on_underlying_io_close` shall be passed as argument to `xio_close`. **]**
 **SRS_UWS_01_032: [** `uws_close` when no open action has been issued shall fail and return a non-zero value. **]**
 **SRS_UWS_01_033: [** `uws_close` after a `uws_close` shall fail and return a non-zero value. **]** 
-**SRS_UWS_01_034: [** `uws_close` shall obtain all the pending IO items by repetitively querying for the head of the pending IO list and freeing that head item. **]**
-**SRS_UWS_01_035: [** Obtaining the head of the pending IO list shall be done by calling `singlylinkedlist_get_head_item`. **]**
-**SRS_UWS_01_036: [** For each pending item the send complete callback shall be called with `UWS_SEND_FRAME_CANCELLED`. **]**
-**SRS_UWS_01_037: [** The callback context passed to the `on_ws_send_frame_complete` callback shall be the context given to `uws_send_frame`. **]** 
+**SRS_UWS_01_034: [** `uws_close` shall obtain all the pending send frames by repetitively querying for the head of the pending IO list and freeing that head item. **]**
+**SRS_UWS_01_035: [** Obtaining the head of the pending send frames list shall be done by calling `singlylinkedlist_get_head_item`. **]**
+**SRS_UWS_01_036: [** For each pending send frame the send complete callback shall be called with `UWS_SEND_FRAME_CANCELLED`. **]**
+**SRS_UWS_01_037: [** When indicating pending send frames as cancelled the callback context passed to the `on_ws_send_frame_complete` callback shall be the context given to `uws_send_frame`. **]** 
 
 ### uws_send_frame
 

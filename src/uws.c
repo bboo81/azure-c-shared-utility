@@ -182,6 +182,11 @@ static void on_underlying_io_bytes_received(void* context, const unsigned char* 
     (void)size;
 }
 
+static void on_underlying_io_close_complete(void* context)
+{
+    (void)context;
+}
+
 static void on_underlying_io_error(void* context)
 {
     (void)context;
@@ -235,4 +240,16 @@ int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_w
     }
 
     return result;
+}
+
+/* Codes_SRS_UWS_01_029: [ `uws_close` shall close the uws instance connection if an open action is either pending or has completed successfully (if the IO is open). ]*/
+int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* on_ws_close_complete_context)
+{
+    (void)uws;
+    (void)on_ws_close_complete;
+    (void)on_ws_close_complete_context;
+    /* Codes_SRS_UWS_01_031: [ `uws_close` shall close the connection by calling `xio_close` while passing as argument the IO handle created in `uws_create`. ]*/
+    /* Codes_SRS_UWS_01_368: [ The callback `on_underlying_io_close` shall be passed as argument to `xio_close`. ]*/
+    xio_close(uws->underlying_io, on_underlying_io_close_complete, uws);
+    return 0;
 }
