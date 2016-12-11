@@ -64,6 +64,7 @@ extern int uws_open(UWS_HANDLE uws, ON_UWS_OPEN_COMPLETE on_ws_open_complete, ON
 ```
 
 **SRS_UWS_01_025: [** `uws_open` shall open the underlying IO by calling `xio_open` and providing the IO handle created in `uws_create` as argument. **]**
+**SRS_UWS_01_367: [** The callbacks `on_underlying_io_open_complete`, `on_underlying_io_bytes_received` and `on_underlying_io_error` shall be passed as arguments to `xio_open`. **]**
 **SRS_UWS_01_026: [** On success, `uws_open` shall return 0. **]**
 **SRS_UWS_01_027: [** If `on_ws_open_complete` or `on_ws_error` is NULL, `uws_open` shall fail and return a non-zero value. **]**
 **SRS_UWS_01_028: [** If opening the underlyion IO fails then `uws_open` shall fail and return a non-zero value. **]**
@@ -76,7 +77,8 @@ extern int uws_close(UWS_HANDLE uws);
 
 **SRS_UWS_01_029: [** `uws_close` shall close the uws instance connection if an open action is either pending or has completed successfully (if the IO is open). **]** 
 **SRS_UWS_01_030: [** if `uws` is NULL, `uws_close` shall return a non-zero value. **]** 
-**SRS_UWS_01_031: [** `uws_close` shall close the connection by calling `xio_close` while passing as argument the IO handle created in `uws_create`. **]** 
+**SRS_UWS_01_031: [** `uws_close` shall close the connection by calling `xio_close` while passing as argument the IO handle created in `uws_create`. **]**
+**SRS_UWS_01_368: [** The callback `on_underlying_io_close` shall be passed as argument to `xio_close`. **]**
 **SRS_UWS_01_032: [** `uws_close` when no open action has been issued shall fail and return a non-zero value. **]**
 **SRS_UWS_01_033: [** `uws_close` after a `uws_close` shall fail and return a non-zero value. **]** 
 **SRS_UWS_01_034: [** `uws_close` shall obtain all the pending IO items by repetitively querying for the head of the pending IO list and freeing that head item. **]**
@@ -121,18 +123,47 @@ extern void uws_dowork(UWS_HANDLE uws);
 **SRS_UWS_01_059: [** If the `uws` argument is NULL, `uws_dowork` shall do nothing. **]**
 **SRS_UWS_01_060: [** If the IO is not yet open, `uws_dowork` shall do nothing. **]**
 
+### on_underlying_io_open_complete
+
+**SRS_UWS_01_370: [** When `on_underlying_io_open_complete` is called while the uws instance has not yet been open, `on_underlying_io_open_complete` shall do nothing. **]**
+**SRS_UWS_01_369: [** When `on_underlying_io_open_complete` is called with `IO_OPEN_ERROR` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_ERROR`. **]**
+**SRS_UWS_01_371: [** When `on_underlying_io_open_complete` is called with `IO_OPEN_OK` while uws is OPENING (`uws_open` was called), uws shall prepare the WebSockets upgrade request. **]**
+**SRS_UWS_01_372: [** Once prepared the WebSocket upgrade request shall be sent by calling `xio_send`. **]**
+**SRS_UWS_01_373: [** If `xio_send` fails then uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_ERROR`. **]**
+**SRS_UWS_01_374: [** When `on_underlying_io_open_complete` is called when the uws instance is already OPEN, an error shall be reported to the user by calling the `on_ws_error` callback that was passed to `uws_open`. **]** 
+
 ### on_underlying_io_error
+
+**SRS_UWS_01_375: [** When `on_underlying_io_error` is called while uws is OPENING, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_ERROR`. **]**
+**SRS_UWS_01_376: [** When `on_underlying_io_error` is called while the uws instance is OPEN, an error shall be reported to the user by calling the `on_ws_error` callback that was passed to `uws_open`. **]**
+**SRS_UWS_01_377: [** When `on_underlying_io_error` is called while the uws instance is in any other state, `on_underlying_io_error` shall do nothing. **]** 
 
 ### on_underlying_io_bytes_received
 
-### on_underlying_io_open_complete
+**SRS_UWS_01_378: [** When `on_underlying_io_bytes_received` is called while the uws is OPENING, the received bytes shall be accumulated in order to attempt parsing the WebSocket Upgrade response. **]**
+**SRS_UWS_01_379: [** If allocating memory for accumulating the bytes fails, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_ERROR`. **]**
+**SRS_UWS_01_380: [** If an WebSocket Upgrade request can be parsed from the accumulated bytes, the status shall be read from the WebSocket upgrade response. **]**
+**SRS_UWS_01_381: [** If the status is 101, uws shall be considered OPEN and this shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_OK`. **]**
+**SRS_UWS_01_382: [** If a negative status is decoded from the WebSocket upgrade request, an error shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_ERROR`. **]**
+**SRS_UWS_01_383: [** If the WebSocket upgrade request cannot be decoded an error shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_ERROR`. **]**
+**SRS_UWS_01_384: [** Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames. **]**
+**SRS_UWS_01_385: [** If the state of the uws instance is OPEN, the received bytes shall be used for decoding WebSocket frames. **]**
+**SRS_UWS_01_386: [** When a WebSocket frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. **]**
+
+### on_underlying_io_close_complete
+
+**SRS_UWS_01_387: [** When `on_underlying_io_close_complete` is called when the uws instance is closing, the `on_ws_close_complete` callback passed to `uws_close` shall be called. **]**
+**SRS_UWS_01_388: [** When `on_underlying_io_close_complete` is called while uws is in OPENING or OPEN state, an error shall be indicated by calling `on_ws_error`. **]**
 
 ### on_underlying_io_send_complete
+
+**SRS_UWS_01_389: [** When `on_underlying_io_send_complete` is called with `IO_SEND_OK` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_complete` with `WS_SEND_OK`. **]**
+**SRS_UWS_01_390: [** When `on_underlying_io_send_complete` is called with `IO_SEND_ERROR` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_complete` with `WS_SEND_ERROR`. **]** 
+**SRS_UWS_01_391: [** When `on_underlying_io_send_complete` is called with `IO_SEND_CANCELLED` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_complete` with `WS_SEND_CANCELLED`. **]**
 
 ### RFC6455
 
 3.  WebSocket URIs
-
 
    This specification defines two URI schemes, using the ABNF syntax defined in RFC 5234 [RFC5234], and terminology and ABNF productions defined by the URI specification RFC 3986 [RFC3986].
 
