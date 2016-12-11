@@ -302,6 +302,9 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_UMOCK_ALIAS_TYPE(LIST_ITEM_HANDLE, void*);
     REGISTER_UMOCK_ALIAS_TYPE(UWS_HANDLE, void*);
     REGISTER_UMOCK_ALIAS_TYPE(XIO_HANDLE, void*);
+    REGISTER_UMOCK_ALIAS_TYPE(ON_IO_OPEN_COMPLETE, void*);
+    REGISTER_UMOCK_ALIAS_TYPE(ON_BYTES_RECEIVED, void*);
+    REGISTER_UMOCK_ALIAS_TYPE(ON_IO_ERROR, void*);
 }
 
 TEST_SUITE_CLEANUP(suite_cleanup)
@@ -346,6 +349,8 @@ TEST_FUNCTION(uws_create_with_valid_args_no_ssl_succeeds)
 {
 	// arrange
     SOCKETIO_CONFIG socketio_config;
+    UWS_HANDLE uws;
+
     socketio_config.accepted_socket = NULL;
     socketio_config.hostname = "test_host";
     socketio_config.port = 80;
@@ -359,7 +364,7 @@ TEST_FUNCTION(uws_create_with_valid_args_no_ssl_succeeds)
         .IgnoreArgument_io_create_parameters();
 
 	// act
-    UWS_HANDLE uws = uws_create("test_host", 80, false);
+    uws = uws_create("test_host", 80, false);
 
 	// assert
 	ASSERT_IS_NOT_NULL(uws);
@@ -387,6 +392,8 @@ TEST_FUNCTION(uws_create_with_valid_args_no_ssl_port_different_than_80_succeeds)
 {
     // arrange
     SOCKETIO_CONFIG socketio_config;
+    UWS_HANDLE uws;
+
     socketio_config.accepted_socket = NULL;
     socketio_config.hostname = "test_host";
     socketio_config.port = 81;
@@ -400,7 +407,7 @@ TEST_FUNCTION(uws_create_with_valid_args_no_ssl_port_different_than_80_succeeds)
         .IgnoreArgument_io_create_parameters();
 
     // act
-    UWS_HANDLE uws = uws_create("test_host", 81, false);
+    uws = uws_create("test_host", 81, false);
 
     // assert
     ASSERT_IS_NOT_NULL(uws);
@@ -415,6 +422,8 @@ TEST_FUNCTION(when_allocating_memory_for_the_new_uws_instance_fails_then_uws_cre
 {
     // arrange
     SOCKETIO_CONFIG socketio_config;
+    UWS_HANDLE uws;
+
     socketio_config.accepted_socket = NULL;
     socketio_config.hostname = "test_host";
     socketio_config.port = 80;
@@ -423,7 +432,7 @@ TEST_FUNCTION(when_allocating_memory_for_the_new_uws_instance_fails_then_uws_cre
         .SetReturn(NULL);
 
     // act
-    UWS_HANDLE uws = uws_create("test_host", 80, false);
+    uws = uws_create("test_host", 80, false);
 
     // assert
     ASSERT_IS_NULL(uws);
@@ -458,6 +467,8 @@ TEST_FUNCTION(when_creating_the_pending_sends_list_fails_then_uws_create_fails)
 {
     // arrange
     SOCKETIO_CONFIG socketio_config;
+    UWS_HANDLE uws;
+
     socketio_config.accepted_socket = NULL;
     socketio_config.hostname = "test_host";
     socketio_config.port = 80;
@@ -471,7 +482,7 @@ TEST_FUNCTION(when_creating_the_pending_sends_list_fails_then_uws_create_fails)
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
 
     // act
-    UWS_HANDLE uws = uws_create("test_host", 80, false);
+    uws = uws_create("test_host", 80, false);
 
     // assert
     ASSERT_IS_NULL(uws);
@@ -510,6 +521,8 @@ TEST_FUNCTION(when_creating_the_io_handle_fails_then_uws_create_fails)
 {
     // arrange
     SOCKETIO_CONFIG socketio_config;
+    UWS_HANDLE uws;
+
     socketio_config.accepted_socket = NULL;
     socketio_config.hostname = "test_host";
     socketio_config.port = 80;
@@ -527,7 +540,7 @@ TEST_FUNCTION(when_creating_the_io_handle_fails_then_uws_create_fails)
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
 
     // act
-    UWS_HANDLE uws = uws_create("test_host", 80, false);
+    uws = uws_create("test_host", 80, false);
 
     // assert
     ASSERT_IS_NULL(uws);
@@ -542,6 +555,8 @@ TEST_FUNCTION(uws_create_with_valid_args_ssl_succeeds)
 {
     // arrange
     TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+
     tlsio_config.hostname = "test_host";
     tlsio_config.port = 443;
 
@@ -554,7 +569,7 @@ TEST_FUNCTION(uws_create_with_valid_args_ssl_succeeds)
         .IgnoreArgument_io_create_parameters();
 
     // act
-    UWS_HANDLE uws = uws_create("test_host", 443, true);
+    uws = uws_create("test_host", 443, true);
 
     // assert
     ASSERT_IS_NOT_NULL(uws);
@@ -572,6 +587,8 @@ TEST_FUNCTION(uws_create_with_valid_args_ssl_port_different_than_443_succeeds)
 {
     // arrange
     TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+
     tlsio_config.hostname = "test_host";
     tlsio_config.port = 444;
 
@@ -584,7 +601,7 @@ TEST_FUNCTION(uws_create_with_valid_args_ssl_port_different_than_443_succeeds)
         .IgnoreArgument_io_create_parameters();
 
     // act
-    UWS_HANDLE uws = uws_create("test_host", 444, true);
+    uws = uws_create("test_host", 444, true);
 
     // assert
     ASSERT_IS_NOT_NULL(uws);
@@ -599,6 +616,8 @@ TEST_FUNCTION(when_getting_the_tlsio_interface_fails_then_uws_create_fails)
 {
     // arrange
     TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+
     tlsio_config.hostname = "test_host";
     tlsio_config.port = 444;
 
@@ -613,7 +632,7 @@ TEST_FUNCTION(when_getting_the_tlsio_interface_fails_then_uws_create_fails)
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
 
     // act
-    UWS_HANDLE uws = uws_create("test_host", 444, true);
+    uws = uws_create("test_host", 444, true);
 
     // assert
     ASSERT_IS_NULL(uws);
@@ -629,10 +648,12 @@ TEST_FUNCTION(uws_destroy_fress_the_resources)
 {
     // arrange
     TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+
     tlsio_config.hostname = "test_host";
     tlsio_config.port = 444;
 
-    UWS_HANDLE uws = uws_create("test_host", 444, true);
+    uws = uws_create("test_host", 444, true);
     umock_c_reset_all_calls();
 
     STRICT_EXPECTED_CALL(xio_destroy(TEST_IO_HANDLE));
@@ -657,6 +678,41 @@ TEST_FUNCTION(uws_destroy_with_NULL_does_nothing)
 
     // assert
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* uws_open */
+
+/* Tests_SRS_UWS_01_025: [ `uws_open` shall open the underlying IO by calling `xio_open` and providing the IO handle created in `uws_create` as argument. ]*/
+TEST_FUNCTION(uws_open_opens_the_underlying_IO)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    int result;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, true);
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(xio_open(TEST_IO_HANDLE, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG))
+        .IgnoreArgument_on_io_open_complete()
+        .IgnoreArgument_on_io_open_complete_context()
+        .IgnoreArgument_on_bytes_received()
+        .IgnoreArgument_on_bytes_received_context()
+        .IgnoreArgument_on_io_error()
+        .IgnoreArgument_on_io_error_context();
+
+    // act
+    result = uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
 }
 
 END_TEST_SUITE(uws_ut)

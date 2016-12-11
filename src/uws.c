@@ -155,3 +155,37 @@ void uws_destroy(UWS_HANDLE uws)
         free(uws);
     }
 }
+
+static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_result)
+{
+    (void)context;
+    (void)open_result;
+}
+
+static void on_underlying_io_bytes_received(void* context, const unsigned char* buffer, size_t size)
+{
+    (void)context;
+    (void)buffer;
+    (void)size;
+}
+
+static void on_underlying_io_error(void* context)
+{
+    (void)context;
+}
+
+int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_ws_open_complete_context, ON_WS_FRAME_RECEIVED on_ws_frame_received, void* on_ws_frame_received_context, ON_WS_ERROR on_ws_error, void* on_ws_error_context)
+{
+    (void)uws;
+    (void)on_ws_open_complete;
+    (void)on_ws_open_complete_context;
+    (void)on_ws_frame_received;
+    (void)on_ws_frame_received_context;
+    (void)on_ws_error;
+    (void)on_ws_error_context;
+
+    /* Codes_SRS_UWS_01_025: [ `uws_open` shall open the underlying IO by calling `xio_open` and providing the IO handle created in `uws_create` as argument. ]*/
+    xio_open(uws->underlying_io, on_underlying_io_open_complete, uws, on_underlying_io_bytes_received, uws, on_underlying_io_error, uws);
+
+    return 0;
+}
