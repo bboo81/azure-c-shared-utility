@@ -46,7 +46,7 @@ extern void uws_dowork(UWS_HANDLE uws);
 extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl);
 ```
 
-**SRS_UWS_01_001: \[**`uws_create` shall create an instance of uws and return a non-NULL handle to it.**\]**
+XX**SRS_UWS_01_001: [**`uws_create` shall create an instance of uws and return a non-NULL handle to it.**]**
 **SRS_UWS_01_002: [** If the argument `hostname` is NULL then `uws_create` shall return NULL. **]**
 **SRS_UWS_01_003: [** If allocating memory for the new uws instance fails then `uws_create` shall return NULL. **]**
 **SRS_UWS_01_004: [** The argument `hostname` shall be copied for later use (they are needed when the IO is opened). **]**
@@ -54,7 +54,7 @@ extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_s
 **SRS_UWS_01_006: [** If `use_ssl` is 1 then `uws_create` shall obtain the interface used to create a tlsio instance by calling `platform_get_default_tlsio`. **]**
 **SRS_UWS_01_007: [** If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. **]** 
 **SRS_UWS_01_008: [** The obtained interface shall be used to create the IO used as underlying IO by the newly created uws instance. **]**
-**SRS_UWS_01_009: [** The underlying IO shall be created by calling `uws_create`. **]**
+**SRS_UWS_01_009: [** The underlying IO shall be created by calling `xio_create`. **]**
 **SRS_UWS_01_010: [** The create arguments for the socket IO (when `use_ssl` is 0) shall have: **]**
 **SRS_UWS_01_011: [** - `host` set to the `host` field in the `io_create_parameters` passed to `uws_create`. **]**
 **SRS_UWS_01_012: [** - `port` set to 80. **]**

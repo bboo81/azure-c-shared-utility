@@ -19,6 +19,11 @@ IMPLEMENT_UMOCK_C_ENUM_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT_VALUES);
 TEST_DEFINE_ENUM_TYPE(IO_SEND_RESULT, IO_SEND_RESULT_VALUES);
 IMPLEMENT_UMOCK_C_ENUM_TYPE(IO_SEND_RESULT, IO_SEND_RESULT_VALUES);
 
+static const void** list_items = NULL;
+static size_t list_item_count = 0;
+static const SINGLYLINKEDLIST_HANDLE TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE = (SINGLYLINKEDLIST_HANDLE)0x4242;
+static const LIST_ITEM_HANDLE TEST_LIST_ITEM_HANDLE = (LIST_ITEM_HANDLE)0x11;
+
 static size_t currentmalloc_call;
 static size_t whenShallmalloc_fail;
 
@@ -54,6 +59,75 @@ int my_mallocAndStrcpy_s(char** destination, const char* source)
     *destination = (char*)malloc(strlen(source) + 1);
     (void)strcpy(*destination, source);
     return 0;
+}
+
+static LIST_ITEM_HANDLE add_to_list(const void* item)
+{
+    const void** items = (const void**)realloc((void*)list_items, (list_item_count + 1) * sizeof(item));
+    if (items != NULL)
+    {
+        list_items = items;
+        list_items[list_item_count++] = item;
+    }
+    return (LIST_ITEM_HANDLE)list_item_count;
+}
+
+static int singlylinkedlist_remove_result;
+
+static int my_singlylinkedlist_remove(SINGLYLINKEDLIST_HANDLE list, LIST_ITEM_HANDLE item)
+{
+    size_t index = (size_t)item - 1;
+    (void)list;
+    (void)memmove((void*)&list_items[index], &list_items[index + 1], sizeof(const void*) * (list_item_count - index - 1));
+    list_item_count--;
+    if (list_item_count == 0)
+    {
+        free((void*)list_items);
+        list_items = NULL;
+    }
+    return singlylinkedlist_remove_result;
+}
+
+static LIST_ITEM_HANDLE my_singlylinkedlist_get_head_item(SINGLYLINKEDLIST_HANDLE list)
+{
+    LIST_ITEM_HANDLE list_item_handle = NULL;
+    (void)list;
+    if (list_item_count > 0)
+    {
+        list_item_handle = (LIST_ITEM_HANDLE)1;
+    }
+    else
+    {
+        list_item_handle = NULL;
+    }
+    return list_item_handle;
+}
+
+LIST_ITEM_HANDLE my_singlylinkedlist_add(SINGLYLINKEDLIST_HANDLE list, const void* item)
+{
+    (void)list;
+    return add_to_list(item);
+}
+
+const void* my_singlylinkedlist_item_get_value(LIST_ITEM_HANDLE item_handle)
+{
+    return (const void*)list_items[(size_t)item_handle - 1];
+}
+
+LIST_ITEM_HANDLE my_singlylinkedlist_find(SINGLYLINKEDLIST_HANDLE handle, LIST_MATCH_FUNCTION match_function, const void* match_context)
+{
+    size_t i;
+    const void* found_item = NULL;
+    (void)handle;
+    for (i = 0; i < list_item_count; i++)
+    {
+        if (match_function((LIST_ITEM_HANDLE)list_items[i], match_context))
+        {
+            found_item = list_items[i];
+            break;
+        }
+    }
+    return (LIST_ITEM_HANDLE)found_item;
 }
 
 #include "azure_c_shared_utility/gballoc.h"
@@ -105,6 +179,12 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_GLOBAL_MOCK_HOOK(gballoc_malloc, my_gballoc_malloc);
     REGISTER_GLOBAL_MOCK_HOOK(gballoc_free, my_gballoc_free);
     REGISTER_GLOBAL_MOCK_HOOK(mallocAndStrcpy_s, my_mallocAndStrcpy_s);
+    REGISTER_GLOBAL_MOCK_RETURN(singlylinkedlist_create, TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE);
+    REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_remove, my_singlylinkedlist_remove);
+    REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_get_head_item, my_singlylinkedlist_get_head_item);
+    REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_add, my_singlylinkedlist_add);
+    REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_item_get_value, my_singlylinkedlist_item_get_value);
+    REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_find, my_singlylinkedlist_find);
     REGISTER_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT);
     REGISTER_TYPE(IO_SEND_RESULT, IO_SEND_RESULT);
 
@@ -131,6 +211,7 @@ TEST_FUNCTION_INITIALIZE(method_init)
 
     currentmalloc_call = 0;
     whenShallmalloc_fail = 0;
+    singlylinkedlist_remove_result = 0;
 }
 
 TEST_FUNCTION_CLEANUP(method_cleanup)
@@ -140,15 +221,13 @@ TEST_FUNCTION_CLEANUP(method_cleanup)
 
 /* uws_create */
 
+/* Tests_SRS_UWS_01_001: [`uws_create` shall create an instance of uws and return a non-NULL handle to it.]*/
+/* Tests_SRS_UWS_01_017: [ `uws_create` shall create a pending send IO list that is to be used to queue send packets by calling `singlylinkedlist_create`. ]*/
 TEST_FUNCTION(uws_create_with_valid_args_no_ssl_succeeds)
 {
 	// arrange
 	EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
     STRICT_EXPECTED_CALL(singlylinkedlist_create());
-    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
-    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
-    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
-    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
 
 	// act
     CONCRETE_IO_HANDLE uws = uws_create("test_host", 443, false);
