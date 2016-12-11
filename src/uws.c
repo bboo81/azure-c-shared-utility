@@ -139,5 +139,19 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
 
 void uws_destroy(UWS_HANDLE uws)
 {
-    (void)uws;
+    /* Codes_SRS_UWS_01_020: [ If `uws` is NULL, `uws_destroy` shall do nothing. ]*/
+    if (uws == NULL)
+    {
+        LogError("NULL uws handle");
+    }
+    else
+    {
+        /* Codes_SRS_UWS_01_019: [ `uws_destroy` shall free all resources associated with the uws instance. ]*/
+        /* Codes_SRS_UWS_01_023: [ `uws_destroy` shall destroy the underlying IO created in `uws_create` by calling `xio_destroy`. ]*/
+        xio_destroy(uws->underlying_io);
+        /* Codes_SRS_UWS_01_024: [ `uws_destroy` shall free the list used to track the pending sends by calling `singlylinkedlist_destroy`. ]*/
+        singlylinkedlist_destroy(uws->pending_sends);
+        free(uws->hostname);
+        free(uws);
+    }
 }

@@ -620,4 +620,43 @@ TEST_FUNCTION(when_getting_the_tlsio_interface_fails_then_uws_create_fails)
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 }
 
+/* uws_destroy */
+
+/* Tests_SRS_UWS_01_019: [ `uws_destroy` shall free all resources associated with the uws instance. ]*/
+/* Tests_SRS_UWS_01_023: [ `uws_destroy` shall destroy the underlying IO created in `uws_create` by calling `xio_destroy`. ]*/
+/* Tests_SRS_UWS_01_024: [ `uws_destroy` shall free the list used to track the pending sends by calling `singlylinkedlist_destroy`. ]*/
+TEST_FUNCTION(uws_destroy_fress_the_resources)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    UWS_HANDLE uws = uws_create("test_host", 444, true);
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(xio_destroy(TEST_IO_HANDLE));
+    STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    uws_destroy(uws);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_020: [ If `uws` is NULL, `uws_destroy` shall do nothing. ]*/
+TEST_FUNCTION(uws_destroy_with_NULL_does_nothing)
+{
+    // arrange
+
+    // act
+    uws_destroy(NULL);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
 END_TEST_SUITE(uws_ut)

@@ -72,12 +72,12 @@ XX**SRS_UWS_01_018: [** If `singlylinkedlist_create` fails then `uws_create` sha
 extern void uws_destroy(UWS_HANDLE uws);
 ```
 
-**SRS_UWS_01_019: [** `uws_destroy` shall free all resources associated with the uws instance. **]**
-**SRS_UWS_01_020: [** If `uws` is NULL, `uws_destroy` shall do nothing. **]** 
+XX**SRS_UWS_01_019: [** `uws_destroy` shall free all resources associated with the uws instance. **]**
+XX**SRS_UWS_01_020: [** If `uws` is NULL, `uws_destroy` shall do nothing. **]** 
 **SRS_UWS_01_021: [** `uws_destroy` shall perform a close action if the uws instance has already been open. **]**
 **SRS_UWS_01_022: [** `uws_destroy` shall execute a close action if an open is in progress. **]**
-**SRS_UWS_01_023: [** `uws_destroy` shall destroy the underlying IO created in `uws_create` by calling `xio_destroy`. **]**
-**SRS_UWS_01_024: [** `uws_destroy` shall free the list used to track the pending sends by calling `singlylinkedlist_destroy`. **]**
+XX**SRS_UWS_01_023: [** `uws_destroy` shall destroy the underlying IO created in `uws_create` by calling `xio_destroy`. **]**
+XX**SRS_UWS_01_024: [** `uws_destroy` shall free the list used to track the pending sends by calling `singlylinkedlist_destroy`. **]**
 
 ### uws_open
 
