@@ -11,11 +11,32 @@ RFC6455 - The WebSocket Protocol.
 ## Exposed API
 
 ```c
+typedef struct UWS_INSTANCE_TAG* UWS_HANDLE;
+
+#define WS_SEND_FRAME_RESULT_VALUES \
+    WS_SEND_FRAME_OK, \
+    WS_SEND_FRAME_ERROR, \
+    WS_SEND_FRAME_CANCELLED
+
+DEFINE_ENUM(WS_SEND_FRAME_RESULT, WS_SEND_FRAME_RESULT_VALUES);
+
+#define WS_OPEN_RESULT_VALUES \
+    WS_OPEN_OK, \
+    WS_OPEN_ERROR, \
+    WS_OPEN_CANCELLED
+
+DEFINE_ENUM(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
+
+typedef void(*ON_WS_FRAME_RECEIVED)(void* context, const unsigned char* buffer, size_t size);
+typedef void(*ON_WS_SEND_FRAME_COMPLETE)(void* context, WS_SEND_FRAME_RESULT ws_send_frame_result);
+typedef void(*ON_WS_OPEN_COMPLETE)(void* context, WS_OPEN_RESULT ws_open_result);
+typedef void(*ON_WS_ERROR)(void* context);
+
 extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl);
 extern void uws_destroy(UWS_HANDLE uws);
-extern int uws_open(UWS_HANDLE uws, ON_UW_OPEN_COMPLETE on_uw_open_complete, ON_WS_FRAME_RECEIVED on_ws_frame_received, ON_WS_ERROR on_ws_error, void* callback_context);
+extern int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_uws_open_complete, ON_WS_FRAME_RECEIVED on_ws_frame_received, ON_WS_ERROR on_ws_error, void* callback_context);
 extern int uws_close(UWS_HANDLE uws);
-extern int uws_send(UWS_HANDLE uws, const unsigned char* buffer, size_t size, ON_WS_SEND_COMPLETE on_ws_send_complete, void* callback_context);
+extern int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* callback_context);
 extern void uws_dowork(UWS_HANDLE uws);
 ```
 
@@ -83,28 +104,28 @@ extern int uws_close(UWS_HANDLE uws);
 **SRS_UWS_01_033: [** `uws_close` after a `uws_close` shall fail and return a non-zero value. **]** 
 **SRS_UWS_01_034: [** `uws_close` shall obtain all the pending IO items by repetitively querying for the head of the pending IO list and freeing that head item. **]**
 **SRS_UWS_01_035: [** Obtaining the head of the pending IO list shall be done by calling `singlylinkedlist_get_head_item`. **]**
-**SRS_UWS_01_036: [** For each pending item the send complete callback shall be called with `UWS_SEND_CANCELLED`. **]**
-**SRS_UWS_01_037: [** The callback context passed to the `on_ws_send_complete` callback shall be the context given to `uws_send`. **]** 
+**SRS_UWS_01_036: [** For each pending item the send complete callback shall be called with `UWS_SEND_FRAME_CANCELLED`. **]**
+**SRS_UWS_01_037: [** The callback context passed to the `on_ws_send_frame_complete` callback shall be the context given to `uws_send_frame`. **]** 
 
-### uws_send
+### uws_send_frame
 
 ```c
-extern int uws_send(UWS_HANDLE uws, const unsigned char* buffer, size_t size, ON_WS_SEND_COMPLETE on_ws_send_complete, void* callback_context);
+extern int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* callback_context);
 ```
 
-**SRS_UWS_01_038: [** `uws_send` shall create and queue a structure that contains: **]**
+**SRS_UWS_01_038: [** `uws_send_frame` shall create and queue a structure that contains: **]**
 **SRS_UWS_01_039: [** - the websocket frame containing the `size` bytes pointed by `buffer`, so that the frame can be later sent when `uws_dowork` is called **]**
-**SRS_UWS_01_040: [** - the send complete callback `on_ws_send_complete` **]**
+**SRS_UWS_01_040: [** - the send complete callback `on_ws_send_frame_complete` **]**
 **SRS_UWS_01_041: [** - the send complete callback context `on_send_complete_context` **]**
-**SRS_UWS_01_042: [** On success, `uws_send` shall return 0. **]**
-**SRS_UWS_01_043: [** If the uws instance is not OPEN (open has not been called or is still in progress) then `uws_send` shall fail and return a non-zero value. **]**
-**SRS_UWS_01_044: [** If any of the arguments `uws` or `buffer` are NULL, `uws_send` shall fail and return a non-zero value. **]**
-**SRS_UWS_01_045: [** If `size` is zero then `uws_send` shall fail and return a non-zero value. **]**
-**SRS_UWS_01_046: [** `uws_send` shall allocate enough memory to hold the websocket frame that contains `size` bytes. **]**
-**SRS_UWS_01_047: [** If allocating memory for the newly queued item fails, `uws_send` shall fail and return a non-zero value. **]**
+**SRS_UWS_01_042: [** On success, `uws_send_frame` shall return 0. **]**
+**SRS_UWS_01_043: [** If the uws instance is not OPEN (open has not been called or is still in progress) then `uws_send_frame` shall fail and return a non-zero value. **]**
+**SRS_UWS_01_044: [** If any of the arguments `uws` or `buffer` are NULL, `uws_send_frame` shall fail and return a non-zero value. **]**
+**SRS_UWS_01_045: [** If `size` is zero then `uws_send_frame` shall fail and return a non-zero value. **]**
+**SRS_UWS_01_046: [** `uws_send_frame` shall allocate enough memory to hold the websocket frame that contains `size` bytes. **]**
+**SRS_UWS_01_047: [** If allocating memory for the newly queued item fails, `uws_send_frame` shall fail and return a non-zero value. **]**
 **SRS_UWS_01_048: [** Queueing shall be done by calling `singlylinkedlist_add`. **]**
-**SRS_UWS_01_049: [** If `singlylinkedlist_add` fails, `uws_send` shall fail and return a non-zero value. **]**
-**SRS_UWS_01_050: [** The argument on_ws_send_complete shall be optional, if NULL is passed by the caller then no send complete callback shall be triggered. **]**
+**SRS_UWS_01_049: [** If `singlylinkedlist_add` fails, `uws_send_frame` shall fail and return a non-zero value. **]**
+**SRS_UWS_01_050: [** The argument on_ws_send_frame_complete shall be optional, if NULL is passed by the caller then no send complete callback shall be triggered. **]**
 
 ### uws_dowork
 
@@ -119,7 +140,7 @@ extern void uws_dowork(UWS_HANDLE uws);
 **SRS_UWS_01_055: [** - the `size` argument shall indicate the websocket frame length. **]**
 **SRS_UWS_01_056: [** - the `send_complete` callback shall be the `uws_send_complete` function. **]**
 **SRS_UWS_01_057: [** - the `send_complete_context` argument shall identify the pending send. **]**
-**SRS_UWS_01_058: [** If `xio_send` fails, `uws_dowork` shall indicate that by calling the `on_ws_send_complete` callback associated with the pending send with the `UWS_SEND_ERROR` code. **]** 
+**SRS_UWS_01_058: [** If `xio_send` fails, `uws_dowork` shall indicate that by calling the `on_ws_send_frame_complete` callback associated with the pending send with the `UWS_SEND_ERROR` code. **]** 
 **SRS_UWS_01_059: [** If the `uws` argument is NULL, `uws_dowork` shall do nothing. **]**
 **SRS_UWS_01_060: [** If the IO is not yet open, `uws_dowork` shall do nothing. **]**
 
@@ -157,9 +178,9 @@ extern void uws_dowork(UWS_HANDLE uws);
 
 ### on_underlying_io_send_complete
 
-**SRS_UWS_01_389: [** When `on_underlying_io_send_complete` is called with `IO_SEND_OK` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_complete` with `WS_SEND_OK`. **]**
-**SRS_UWS_01_390: [** When `on_underlying_io_send_complete` is called with `IO_SEND_ERROR` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_complete` with `WS_SEND_ERROR`. **]** 
-**SRS_UWS_01_391: [** When `on_underlying_io_send_complete` is called with `IO_SEND_CANCELLED` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_complete` with `WS_SEND_CANCELLED`. **]**
+**SRS_UWS_01_389: [** When `on_underlying_io_send_complete` is called with `IO_SEND_OK` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_OK`. **]**
+**SRS_UWS_01_390: [** When `on_underlying_io_send_complete` is called with `IO_SEND_ERROR` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_ERROR`. **]** 
+**SRS_UWS_01_391: [** When `on_underlying_io_send_complete` is called with `IO_SEND_CANCELLED` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_CANCELLED`. **]**
 
 ### RFC6455
 

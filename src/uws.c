@@ -9,3 +9,15 @@
 #include "azure_c_shared_utility/uws.h"
 #include "azure_c_shared_utility/xlogging.h"
 
+UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
+{
+    (void)hostname;
+    (void)port;
+    (void)use_ssl;
+    return NULL;
+}
+
+void uws_destroy(UWS_HANDLE uws)
+{
+    (void)uws;
+}
