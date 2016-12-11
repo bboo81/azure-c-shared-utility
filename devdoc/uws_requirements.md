@@ -86,10 +86,12 @@ extern int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, voi
 ```
 
 XX**SRS_UWS_01_025: [** `uws_open` shall open the underlying IO by calling `xio_open` and providing the IO handle created in `uws_create` as argument. **]**
-**SRS_UWS_01_367: [** The callbacks `on_underlying_io_open_complete`, `on_underlying_io_bytes_received` and `on_underlying_io_error` shall be passed as arguments to `xio_open`. **]**
-**SRS_UWS_01_026: [** On success, `uws_open` shall return 0. **]**
-**SRS_UWS_01_027: [** If `on_ws_open_complete` or `on_ws_error` is NULL, `uws_open` shall fail and return a non-zero value. **]**
-**SRS_UWS_01_028: [** If opening the underlyion IO fails then `uws_open` shall fail and return a non-zero value. **]**
+XX**SRS_UWS_01_367: [** The callbacks `on_underlying_io_open_complete`, `on_underlying_io_bytes_received` and `on_underlying_io_error` shall be passed as arguments to `xio_open`. **]**
+XX**SRS_UWS_01_026: [** On success, `uws_open` shall return 0. **]**
+XX**SRS_UWS_01_027: [** If `uws`, `on_ws_open_complete`, `on_ws_frame_received` or `on_ws_error` is NULL, `uws_open` shall fail and return a non-zero value. **]**
+XX**SRS_UWS_01_393: [** The context arguments for the callbacks shall be allowed to be NULL. **]**
+XX**SRS_UWS_01_028: [** If opening the underlying IO fails then `uws_open` shall fail and return a non-zero value. **]**
+XX**SRS_UWS_01_394: [** `uws_open` while the uws instance is already OPEN or OPENING shall fail and return a non-zero value. **]**
 
 ### uws_close
 

@@ -683,6 +683,8 @@ TEST_FUNCTION(uws_destroy_with_NULL_does_nothing)
 /* uws_open */
 
 /* Tests_SRS_UWS_01_025: [ `uws_open` shall open the underlying IO by calling `xio_open` and providing the IO handle created in `uws_create` as argument. ]*/
+/* Tests_SRS_UWS_01_367: [ The callbacks `on_underlying_io_open_complete`, `on_underlying_io_bytes_received` and `on_underlying_io_error` shall be passed as arguments to `xio_open`. ]*/
+/* Tests_SRS_UWS_01_026: [ On success, `uws_open` shall return 0. ]*/
 TEST_FUNCTION(uws_open_opens_the_underlying_IO)
 {
     // arrange
@@ -709,6 +711,254 @@ TEST_FUNCTION(uws_open_opens_the_underlying_IO)
 
     // assert
     ASSERT_ARE_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_027: [ If `uws`, `on_ws_open_complete`, `on_ws_frame_received` or `on_ws_error` is NULL, `uws_open` shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(uws_open_with_NULL_handle_fails)
+{
+    // arrange
+    int result;
+
+    // act
+    result = uws_open(NULL, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_027: [ If `uws`, `on_ws_open_complete`, `on_ws_frame_received` or `on_ws_error` is NULL, `uws_open` shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(uws_open_with_NULL_on_ws_open_complete_callback_fails)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    int result;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, true);
+    umock_c_reset_all_calls();
+
+    // act
+    result = uws_open(uws, NULL, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_027: [ If `uws`, `on_ws_open_complete`, `on_ws_frame_received` or `on_ws_error` is NULL, `uws_open` shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(uws_open_with_NULL_on_ws_frame_received_callback_fails)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    int result;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, true);
+    umock_c_reset_all_calls();
+
+    // act
+    result = uws_open(uws, test_on_ws_open_complete, (void*)0x4242, NULL, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_027: [ If `uws`, `on_ws_open_complete`, `on_ws_frame_received` or `on_ws_error` is NULL, `uws_open` shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(uws_open_with_NULL_on_ws_error_callback_fails)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    int result;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, true);
+    umock_c_reset_all_calls();
+
+    // act
+    result = uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, NULL, (void*)0x4244);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_393: [ The context arguments for the callbacks shall be allowed to be NULL. ]*/
+TEST_FUNCTION(uws_open_with_NULL_on_ws_open_complete_context_succeeds)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    int result;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, true);
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(xio_open(TEST_IO_HANDLE, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG))
+        .IgnoreArgument_on_io_open_complete()
+        .IgnoreArgument_on_io_open_complete_context()
+        .IgnoreArgument_on_bytes_received()
+        .IgnoreArgument_on_bytes_received_context()
+        .IgnoreArgument_on_io_error()
+        .IgnoreArgument_on_io_error_context();
+
+    // act
+    result = uws_open(uws, test_on_ws_open_complete, NULL, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_393: [ The context arguments for the callbacks shall be allowed to be NULL. ]*/
+TEST_FUNCTION(uws_open_with_NULL_on_ws_frame_received_context_succeeds)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    int result;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, true);
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(xio_open(TEST_IO_HANDLE, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG))
+        .IgnoreArgument_on_io_open_complete()
+        .IgnoreArgument_on_io_open_complete_context()
+        .IgnoreArgument_on_bytes_received()
+        .IgnoreArgument_on_bytes_received_context()
+        .IgnoreArgument_on_io_error()
+        .IgnoreArgument_on_io_error_context();
+
+    // act
+    result = uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, NULL, test_on_ws_error, (void*)0x4244);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_393: [ The context arguments for the callbacks shall be allowed to be NULL. ]*/
+TEST_FUNCTION(uws_open_with_NULL_on_ws_error_context_succeeds)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    int result;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, true);
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(xio_open(TEST_IO_HANDLE, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG))
+        .IgnoreArgument_on_io_open_complete()
+        .IgnoreArgument_on_io_open_complete_context()
+        .IgnoreArgument_on_bytes_received()
+        .IgnoreArgument_on_bytes_received_context()
+        .IgnoreArgument_on_io_error()
+        .IgnoreArgument_on_io_error_context();
+
+    // act
+    result = uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, NULL);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_028: [ If opening the underlying IO fails then `uws_open` shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(when_opening_the_underlying_io_fails_uws_open_fails)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    int result;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, true);
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(xio_open(TEST_IO_HANDLE, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG))
+        .IgnoreArgument_on_io_open_complete()
+        .IgnoreArgument_on_io_open_complete_context()
+        .IgnoreArgument_on_bytes_received()
+        .IgnoreArgument_on_bytes_received_context()
+        .IgnoreArgument_on_io_error()
+        .IgnoreArgument_on_io_error_context()
+        .SetReturn(1);
+
+    // act
+    result = uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_394: [ `uws_open` while the uws instance is already OPEN or OPENING shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(uws_open_after_uws_open_without_a_close_fails)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    int result;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, true);
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    umock_c_reset_all_calls();
+
+    // act
+    result = uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 
     // cleanup

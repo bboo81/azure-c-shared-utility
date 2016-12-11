@@ -15,11 +15,20 @@
 #include "azure_c_shared_utility/tlsio.h"
 #include "azure_c_shared_utility/crt_abstractions.h"
 
+typedef enum UWS_STATE_TAG
+{
+    UWS_STATE_CLOSED,
+    UWS_STATE_OPENING_UNDERLYING_IO,
+    UWS_STATE_OPEN,
+    UWS_STATE_ERROR
+} UWS_STATE;
+
 typedef struct UWS_INSTANCE_TAG
 {
     SINGLYLINKEDLIST_HANDLE pending_sends;
     XIO_HANDLE underlying_io;
     char* hostname;
+    UWS_STATE uws_state;
 } UWS_INSTANCE;
 
 UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
@@ -129,6 +138,10 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
                         free(result);
                         result = NULL;
                     }
+                    else
+                    {
+                        result->uws_state = UWS_STATE_CLOSED;
+                    }
                 }
             }
         }
@@ -176,16 +189,50 @@ static void on_underlying_io_error(void* context)
 
 int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_ws_open_complete_context, ON_WS_FRAME_RECEIVED on_ws_frame_received, void* on_ws_frame_received_context, ON_WS_ERROR on_ws_error, void* on_ws_error_context)
 {
-    (void)uws;
-    (void)on_ws_open_complete;
+    int result;
+
     (void)on_ws_open_complete_context;
-    (void)on_ws_frame_received;
     (void)on_ws_frame_received_context;
-    (void)on_ws_error;
     (void)on_ws_error_context;
 
-    /* Codes_SRS_UWS_01_025: [ `uws_open` shall open the underlying IO by calling `xio_open` and providing the IO handle created in `uws_create` as argument. ]*/
-    xio_open(uws->underlying_io, on_underlying_io_open_complete, uws, on_underlying_io_bytes_received, uws, on_underlying_io_error, uws);
+    /* Codes_SRS_UWS_01_393: [ The context arguments for the callbacks shall be allowed to be NULL. ]*/
+    if ((uws == NULL) ||
+        (on_ws_open_complete == NULL) ||
+        (on_ws_frame_received == NULL) ||
+        (on_ws_error == NULL))
+    {
+        /* Codes_SRS_UWS_01_027: [ If `uws`, `on_ws_open_complete`, `on_ws_frame_received` or `on_ws_error` is NULL, `uws_open` shall fail and return a non-zero value. ]*/
+        LogError("Invalid arguments: uws=%p, on_ws_open_complete=%p, on_ws_frame_received=%p, on_ws_error=%p",
+            uws, on_ws_open_complete, on_ws_frame_received, on_ws_error);
+        result = __LINE__;
+    }
+    else
+    {
+        if (uws->uws_state != UWS_STATE_CLOSED)
+        {
+            /* Codes_SRS_UWS_01_394: [ `uws_open` while the uws instance is already OPEN or OPENING shall fail and return a non-zero value. ]*/
+            LogError("Invalid uWS state while trying to open: %d", (int)uws->uws_state);
+            result = __LINE__;
+        }
+        else
+        {
+            /* Codes_SRS_UWS_01_025: [ `uws_open` shall open the underlying IO by calling `xio_open` and providing the IO handle created in `uws_create` as argument. ]*/
+            /* Codes_SRS_UWS_01_367: [ The callbacks `on_underlying_io_open_complete`, `on_underlying_io_bytes_received` and `on_underlying_io_error` shall be passed as arguments to `xio_open`. ]*/
+            if (xio_open(uws->underlying_io, on_underlying_io_open_complete, uws, on_underlying_io_bytes_received, uws, on_underlying_io_error, uws) != 0)
+            {
+                /* Codes_SRS_UWS_01_028: [ If opening the underlying IO fails then `uws_open` shall fail and return a non-zero value. ]*/
+                LogError("Opening the underlying IO failed");
+                result = __LINE__;
+            }
+            else
+            {
+                uws->uws_state = UWS_STATE_OPENING_UNDERLYING_IO;
 
-    return 0;
+                /* Codes_SRS_UWS_01_026: [ On success, `uws_open` shall return 0. ]*/
+                result = 0;
+            }
+        }
+    }
+
+    return result;
 }
