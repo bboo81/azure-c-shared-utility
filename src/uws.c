@@ -181,8 +181,22 @@ void uws_destroy(UWS_HANDLE uws)
 static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_result)
 {
     UWS_HANDLE uws = context;
-    uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_UNDERLYING_IO_OPEN_ERROR);
-    (void)open_result;
+    /* Codes_SRS_UWS_01_401: [ If `on_underlying_io_open_complete` is called with a NULL context, `on_underlying_io_open_complete` shall do nothing. ]*/
+    if (uws == NULL)
+    {
+        LogError("NULL context");
+    }
+    else
+    {
+        switch (open_result)
+        {
+        default:
+        case IO_OPEN_ERROR:
+            /* Codes_SRS_UWS_01_369: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_ERROR` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_UNDERLYING_IO_OPEN_ERROR`. ]*/
+            uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_UNDERLYING_IO_OPEN_ERROR);
+            break;
+        }
+    }
 }
 
 static void on_underlying_io_bytes_received(void* context, const unsigned char* buffer, size_t size)

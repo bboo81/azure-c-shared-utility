@@ -157,6 +157,7 @@ extern void uws_dowork(UWS_HANDLE uws);
 ### on_underlying_io_open_complete
 
 XX**SRS_UWS_01_369: [** When `on_underlying_io_open_complete` is called with `IO_OPEN_ERROR` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_UNDERLYING_IO_OPEN_ERROR`. **]**
+**SRS_UWS_01_401: [** If `on_underlying_io_open_complete` is called with a NULL context, `on_underlying_io_open_complete` shall do nothing. **]** 
 **SRS_UWS_01_371: [** When `on_underlying_io_open_complete` is called with `IO_OPEN_OK` while uws is OPENING (`uws_open` was called), uws shall prepare the WebSockets upgrade request. **]**
 **SRS_UWS_01_372: [** Once prepared the WebSocket upgrade request shall be sent by calling `xio_send`. **]**
 **SRS_UWS_01_373: [** If `xio_send` fails then uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_ERROR`. **]**
