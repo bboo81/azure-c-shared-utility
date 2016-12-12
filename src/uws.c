@@ -19,6 +19,7 @@ typedef enum UWS_STATE_TAG
 {
     UWS_STATE_CLOSED,
     UWS_STATE_OPENING_UNDERLYING_IO,
+    UWS_STATE_WAITING_FOR_UPGRADE_RESPONSE,
     UWS_STATE_OPEN,
     UWS_STATE_CLOSING,
     UWS_STATE_ERROR
@@ -208,68 +209,78 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
     }
     else
     {
-        switch (open_result)
+        switch (uws->uws_state)
         {
         default:
-        case IO_OPEN_ERROR:
-            /* Codes_SRS_UWS_01_369: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_ERROR` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_UNDERLYING_IO_OPEN_FAILED`. ]*/
-            uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_UNDERLYING_IO_OPEN_FAILED);
+        case UWS_STATE_WAITING_FOR_UPGRADE_RESPONSE:
+            /* Codes_SRS_UWS_01_407: [ When `on_underlying_io_open_complete` is called when the uws instance has send the upgrade request but it is waiting for the response, an error shall be reported to the user by calling the `on_ws_open_complete` with `WS_OPEN_ERROR_MULTIPLE_UNDERLYING_IO_OPEN_EVENTS`. ]*/
+            LogError("underlying on_io_open_complete was called again after upgrade request was sent.");
+            uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_MULTIPLE_UNDERLYING_IO_OPEN_EVENTS);
             break;
-        case IO_OPEN_CANCELLED:
-            /* Codes_SRS_UWS_01_402: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_CANCELLED` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_UNDERLYING_IO_OPEN_CANCELLED`. ]*/
-            uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_UNDERLYING_IO_OPEN_CANCELLED);
-            break;
-        case IO_OPEN_OK:
-        {
-            int upgrade_request_length;
-            char* upgrade_request;
+        case UWS_STATE_OPENING_UNDERLYING_IO:
+            switch (open_result)
+            {
+            default:
+            case IO_OPEN_ERROR:
+                /* Codes_SRS_UWS_01_369: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_ERROR` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_UNDERLYING_IO_OPEN_FAILED`. ]*/
+                uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_UNDERLYING_IO_OPEN_FAILED);
+                break;
+            case IO_OPEN_CANCELLED:
+                /* Codes_SRS_UWS_01_402: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_CANCELLED` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_UNDERLYING_IO_OPEN_CANCELLED`. ]*/
+                uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_UNDERLYING_IO_OPEN_CANCELLED);
+                break;
+            case IO_OPEN_OK:
+            {
+                int upgrade_request_length;
+                char* upgrade_request;
 
-            /* Codes_SRS_UWS_01_371: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_OK` while uws is OPENING (`uws_open` was called), uws shall prepare the WebSockets upgrade request. ]*/
-            const char upgrade_request_format[] = "GET /$iothub/websocket HTTP/1.1\r\n"
-                "Host: %s:443\r\n"
-                "Upgrade: websocket\r\n"
-                "Connection: Upgrade\r\n"
-                "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
-                "Sec-WebSocket-Protocol: AMQPWSB10\r\n"
-                "Sec-WebSocket-Version: 13\r\n"
-                "\r\n";
+                /* Codes_SRS_UWS_01_371: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_OK` while uws is OPENING (`uws_open` was called), uws shall prepare the WebSockets upgrade request. ]*/
+                const char upgrade_request_format[] = "GET /$iothub/websocket HTTP/1.1\r\n"
+                    "Host: %s:443\r\n"
+                    "Upgrade: websocket\r\n"
+                    "Connection: Upgrade\r\n"
+                    "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+                    "Sec-WebSocket-Protocol: AMQPWSB10\r\n"
+                    "Sec-WebSocket-Version: 13\r\n"
+                    "\r\n";
 
-            upgrade_request_length = snprintf(NULL, 0, upgrade_request_format, uws->resource, uws->hostname, uws->port);
-            if (upgrade_request_length < 0)
-            {
-                uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_NOT_ENOUGH_MEMORY);
-            }
-            else
-            {
-
-            }
-            upgrade_request = (char*)malloc(upgrade_request_length);
-            if (upgrade_request == NULL)
-            {
-                /* Codes_SRS_UWS_01_406: [ If not enough memory can be allocated to construct the WebSocket upgrade request, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_NOT_ENOUGH_MEMORY`. ]*/
-                LogError("Cannot allocate memory for the WebSocket upgrade request");
-                uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_NOT_ENOUGH_MEMORY);
-            }
-            else
-            {
-                /* No need to have any send complete here, as we are monitoring the received bytes */
-                /* Codes_SRS_UWS_01_372: [ Once prepared the WebSocket upgrade request shall be sent by calling `xio_send`. ]*/
-                if (xio_send(uws->underlying_io, upgrade_request, upgrade_request_length, NULL, NULL) != 0)
+                upgrade_request_length = snprintf(NULL, 0, upgrade_request_format, uws->resource, uws->hostname, uws->port);
+                if (upgrade_request_length < 0)
                 {
-                    /* Codes_SRS_UWS_01_373: [ If `xio_send` fails then uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST`. ]*/
-                    LogError("Cannot send upgrade request");
-                    uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST);
+                    uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_NOT_ENOUGH_MEMORY);
                 }
                 else
                 {
 
                 }
+                upgrade_request = (char*)malloc(upgrade_request_length);
+                if (upgrade_request == NULL)
+                {
+                    /* Codes_SRS_UWS_01_406: [ If not enough memory can be allocated to construct the WebSocket upgrade request, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_NOT_ENOUGH_MEMORY`. ]*/
+                    LogError("Cannot allocate memory for the WebSocket upgrade request");
+                    uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_NOT_ENOUGH_MEMORY);
+                }
+                else
+                {
+                    /* No need to have any send complete here, as we are monitoring the received bytes */
+                    /* Codes_SRS_UWS_01_372: [ Once prepared the WebSocket upgrade request shall be sent by calling `xio_send`. ]*/
+                    if (xio_send(uws->underlying_io, upgrade_request, upgrade_request_length, NULL, NULL) != 0)
+                    {
+                        /* Codes_SRS_UWS_01_373: [ If `xio_send` fails then uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST`. ]*/
+                        LogError("Cannot send upgrade request");
+                        uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST);
+                    }
+                    else
+                    {
+                        uws->uws_state = UWS_STATE_WAITING_FOR_UPGRADE_RESPONSE;
+                    }
 
-                free(upgrade_request);
+                    free(upgrade_request);
+                }
+
+                break;
             }
-
-            break;
-        }
+            }
         }
     }
 }
