@@ -34,7 +34,7 @@ typedef void(*ON_WS_OPEN_COMPLETE)(void* context, WS_OPEN_RESULT ws_open_result)
 typedef void(*ON_WS_CLOSE_COMPLETE)(void* context);
 typedef void(*ON_WS_ERROR)(void* context);
 
-extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl);
+extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource, bool use_ssl);
 extern void uws_destroy(UWS_HANDLE uws);
 extern int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_ws_open_complete_context, ON_WS_FRAME_RECEIVED on_ws_frame_received, void* on_ws_frame_received_context, ON_WS_ERROR on_ws_error, void* on_ws_error_context);
 extern int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* on_ws_close_complete_context);
