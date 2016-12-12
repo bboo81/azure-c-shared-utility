@@ -212,16 +212,17 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
         {
         default:
         case IO_OPEN_ERROR:
-            /* Codes_SRS_UWS_01_369: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_ERROR` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_UNDERLYING_IO_OPEN_ERROR`. ]*/
-            uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_UNDERLYING_IO_OPEN_ERROR);
+            /* Codes_SRS_UWS_01_369: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_ERROR` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_UNDERLYING_IO_OPEN_FAILED`. ]*/
+            uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_UNDERLYING_IO_OPEN_FAILED);
             break;
         case IO_OPEN_CANCELLED:
-            /* Codes_SRS_UWS_01_402: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_CANCELLED` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_UNDERLYING_IO_OPEN_CANCELLED_ERROR`. ]*/
-            uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_UNDERLYING_IO_OPEN_CANCELLED_ERROR);
+            /* Codes_SRS_UWS_01_402: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_CANCELLED` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_UNDERLYING_IO_OPEN_CANCELLED`. ]*/
+            uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_UNDERLYING_IO_OPEN_CANCELLED);
             break;
         case IO_OPEN_OK:
         {
-            size_t upgrade_request_length;
+            int upgrade_request_length;
+            char* upgrade_request;
 
             /* Codes_SRS_UWS_01_371: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_OK` while uws is OPENING (`uws_open` was called), uws shall prepare the WebSockets upgrade request. ]*/
             const char upgrade_request_format[] = "GET /$iothub/websocket HTTP/1.1\r\n"
@@ -234,8 +235,30 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
                 "\r\n";
 
             upgrade_request_length = snprintf(NULL, 0, upgrade_request_format, uws->resource, uws->hostname, uws->port);
+            if (upgrade_request_length < 0)
+            {
+                uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_NOT_ENOUGH_MEMORY);
+            }
+            else
+            {
 
-            /* Codes_SRS_UWS_01_372: [ Once prepared the WebSocket upgrade request shall be sent by calling `xio_send`. ]*/
+            }
+            upgrade_request = (char*)malloc(upgrade_request_length);
+            if (upgrade_request == NULL)
+            {
+                /* Codes_SRS_UWS_01_406: [ If not enough memory can be allocated to construct the WebSocket upgrade request, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_NOT_ENOUGH_MEMORY`. ]*/
+                LogError("Cannot allocate memory for the WebSocket upgrade request");
+                uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_NOT_ENOUGH_MEMORY);
+            }
+            else
+            {
+                /* No need to have any send complete here, as we are monitoring the received bytes */
+                /* Codes_SRS_UWS_01_372: [ Once prepared the WebSocket upgrade request shall be sent by calling `xio_send`. ]*/
+                xio_send(uws->underlying_io, upgrade_request, upgrade_request_length, NULL, NULL);
+
+                free(upgrade_request);
+            }
+
             break;
         }
         }
