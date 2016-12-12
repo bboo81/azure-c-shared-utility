@@ -20,6 +20,7 @@ typedef enum UWS_STATE_TAG
     UWS_STATE_CLOSED,
     UWS_STATE_OPENING_UNDERLYING_IO,
     UWS_STATE_OPEN,
+    UWS_STATE_CLOSING,
     UWS_STATE_ERROR
 } UWS_STATE;
 
@@ -29,6 +30,8 @@ typedef struct UWS_INSTANCE_TAG
     XIO_HANDLE underlying_io;
     char* hostname;
     UWS_STATE uws_state;
+    ON_WS_CLOSE_COMPLETE on_ws_close_complete;
+    void* on_ws_close_complete_context;
 } UWS_INSTANCE;
 
 UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
@@ -141,6 +144,8 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
                     else
                     {
                         result->uws_state = UWS_STATE_CLOSED;
+                        result->on_ws_close_complete = NULL;
+                        result->on_ws_close_complete_context = NULL;
                     }
                 }
             }
@@ -215,6 +220,7 @@ int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_w
     {
         if (uws->uws_state != UWS_STATE_CLOSED)
         {
+            /* Codes_SRS_UWS_01_400: [ `uws_open` while CLOSING shall fail and return a non-zero value. ]*/
             /* Codes_SRS_UWS_01_394: [ `uws_open` while the uws instance is already OPEN or OPENING shall fail and return a non-zero value. ]*/
             LogError("Invalid uWS state while trying to open: %d", (int)uws->uws_state);
             result = __LINE__;
@@ -245,11 +251,48 @@ int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_w
 /* Codes_SRS_UWS_01_029: [ `uws_close` shall close the uws instance connection if an open action is either pending or has completed successfully (if the IO is open). ]*/
 int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* on_ws_close_complete_context)
 {
-    (void)uws;
-    (void)on_ws_close_complete;
-    (void)on_ws_close_complete_context;
-    /* Codes_SRS_UWS_01_031: [ `uws_close` shall close the connection by calling `xio_close` while passing as argument the IO handle created in `uws_create`. ]*/
-    /* Codes_SRS_UWS_01_368: [ The callback `on_underlying_io_close` shall be passed as argument to `xio_close`. ]*/
-    xio_close(uws->underlying_io, on_underlying_io_close_complete, uws);
-    return 0;
+    int result;
+
+    /* Codes_SRS_UWS_01_397: [ The `on_ws_close_complete` argument shall be allowed to be NULL, in which case no callback shall be called when the close is complete. ]*/
+    /* Codes_SRS_UWS_01_398: [ `on_ws_close_complete_context` shall also be allows to be NULL. ]*/
+    if (uws == NULL)
+    {
+        /* Codes_SRS_UWS_01_030: [ if `uws` is NULL, `uws_close` shall return a non-zero value. ]*/
+        LogError("NULL uWS handle.");
+        result = __LINE__;
+    }
+    else
+    {
+        if ((uws->uws_state == UWS_STATE_CLOSED) ||
+            (uws->uws_state == UWS_STATE_CLOSING))
+        {
+            /* Codes_SRS_UWS_01_032: [ `uws_close` when no open action has been issued shall fail and return a non-zero value. ]*/
+            LogError("close has been called when already CLOSED");
+            result = __LINE__;
+        }
+        else
+        {
+            /* Codes_SRS_UWS_01_399: [ `on_ws_close_complete` and `on_ws_close_complete_context` shall be saved and the callback `on_ws_close_complete` shall be triggered when the close is complete. ]*/
+            uws->on_ws_close_complete = on_ws_close_complete;
+            uws->on_ws_close_complete_context = on_ws_close_complete_context;
+            
+            uws->uws_state = UWS_STATE_CLOSING;
+
+            /* Codes_SRS_UWS_01_031: [ `uws_close` shall close the connection by calling `xio_close` while passing as argument the IO handle created in `uws_create`. ]*/
+            /* Codes_SRS_UWS_01_368: [ The callback `on_underlying_io_close` shall be passed as argument to `xio_close`. ]*/
+            if (xio_close(uws->underlying_io, on_underlying_io_close_complete, uws) != 0)
+            {
+                /* Codes_SRS_UWS_01_395: [ If `xio_close` fails, `uws_close` shall fail and return a non-zero value. ]*/
+                LogError("Closing the underlying IO failed.");
+                result = __LINE__;
+            }
+            else
+            {
+                /* Codes_SRS_UWS_01_396: [ On success `uws_close` shall return 0. ]*/
+                result = 0;
+            }
+        }
+    }
+
+    return result;
 }
