@@ -203,6 +203,13 @@ static void indicate_ws_open_complete_error(UWS_INSTANCE* uws, WS_OPEN_RESULT ws
 {
     /* Codes_SRS_UWS_01_409: [ After any error is indicated by `on_ws_open_complete`, a subsequent `uws_open` shall be possible. ]*/
     uws->on_ws_open_complete(uws->on_ws_open_complete_context, ws_open_result);
+    uws->uws_state = UWS_STATE_CLOSED;
+}
+
+static void indicate_ws_open_complete_error_and_close(UWS_INSTANCE* uws, WS_OPEN_RESULT ws_open_result)
+{
+    indicate_ws_open_complete_error(uws, ws_open_result);
+    xio_close(uws->underlying_io, NULL, NULL);
 }
 
 static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_result)
@@ -221,7 +228,7 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
         case UWS_STATE_WAITING_FOR_UPGRADE_RESPONSE:
             /* Codes_SRS_UWS_01_407: [ When `on_underlying_io_open_complete` is called when the uws instance has send the upgrade request but it is waiting for the response, an error shall be reported to the user by calling the `on_ws_open_complete` with `WS_OPEN_ERROR_MULTIPLE_UNDERLYING_IO_OPEN_EVENTS`. ]*/
             LogError("underlying on_io_open_complete was called again after upgrade request was sent.");
-            indicate_ws_open_complete_error(uws, WS_OPEN_ERROR_MULTIPLE_UNDERLYING_IO_OPEN_EVENTS);
+            indicate_ws_open_complete_error_and_close(uws, WS_OPEN_ERROR_MULTIPLE_UNDERLYING_IO_OPEN_EVENTS);
             break;
         case UWS_STATE_OPENING_UNDERLYING_IO:
             switch (open_result)
@@ -255,7 +262,7 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
                 {
                     /* Codes_SRS_UWS_01_408: [ If constructing of the WebSocket upgrade request fails, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_CONSTRUCTING_UPGRADE_REQUEST`. ]*/
                     LogError("Cannot construct the WebSocket upgrade request");
-                    indicate_ws_open_complete_error(uws, WS_OPEN_ERROR_NOT_ENOUGH_MEMORY);
+                    indicate_ws_open_complete_error_and_close(uws, WS_OPEN_ERROR_CONSTRUCTING_UPGRADE_REQUEST);
                 }
                 else
                 {
@@ -264,7 +271,7 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
                     {
                         /* Codes_SRS_UWS_01_406: [ If not enough memory can be allocated to construct the WebSocket upgrade request, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_NOT_ENOUGH_MEMORY`. ]*/
                         LogError("Cannot allocate memory for the WebSocket upgrade request");
-                        indicate_ws_open_complete_error(uws, WS_OPEN_ERROR_NOT_ENOUGH_MEMORY);
+                        indicate_ws_open_complete_error_and_close(uws, WS_OPEN_ERROR_NOT_ENOUGH_MEMORY);
                     }
                     else
                     {
@@ -274,7 +281,7 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
                         {
                             /* Codes_SRS_UWS_01_373: [ If `xio_send` fails then uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST`. ]*/
                             LogError("Cannot send upgrade request");
-                            indicate_ws_open_complete_error(uws, WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST);
+                            indicate_ws_open_complete_error_and_close(uws, WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST);
                         }
                         else
                         {

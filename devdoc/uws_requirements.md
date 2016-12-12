@@ -175,7 +175,7 @@ XX**SRS_UWS_01_372: [** Once prepared the WebSocket upgrade request shall be sen
 XX**SRS_UWS_01_373: [** If `xio_send` fails then uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST`. **]**
 **SRS_UWS_01_374: [** When `on_underlying_io_open_complete` is called when the uws instance is already OPEN, an error shall be reported to the user by calling the `on_ws_error` callback that was passed to `uws_open`. **]** 
 XX**SRS_UWS_01_407: [** When `on_underlying_io_open_complete` is called when the uws instance has send the upgrade request but it is waiting for the response, an error shall be reported to the user by calling the `on_ws_open_complete` with `WS_OPEN_ERROR_MULTIPLE_UNDERLYING_IO_OPEN_EVENTS`. **]**
-**SRS_UWS_01_409: [** After any error is indicated by `on_ws_open_complete`, a subsequent `uws_open` shall be possible. **]**
+XX**SRS_UWS_01_409: [** After any error is indicated by `on_ws_open_complete`, a subsequent `uws_open` shall be possible. **]**
 
 ### on_underlying_io_error
 
