@@ -22,7 +22,13 @@ DEFINE_ENUM(WS_SEND_FRAME_RESULT, WS_SEND_FRAME_RESULT_VALUES);
 
 #define WS_OPEN_RESULT_VALUES \
     WS_OPEN_OK, \
-    WS_OPEN_UNDERLYING_IO_OPEN_ERROR, \
+    WS_OPEN_ERROR_UNDERLYING_IO_OPEN_FAILED, \
+    WS_OPEN_ERROR_UNDERLYING_IO_OPEN_CANCELLED, \
+    WS_OPEN_ERROR_NOT_ENOUGH_MEMORY, \
+    WS_OPEN_ERROR_CANNOT_CONSTRUCT_UPGRADE_REQUEST, \
+    WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST, \
+    WS_OPEN_ERROR_MULTIPLE_UNDERLYING_IO_OPEN_EVENTS, \
+    WS_OPEN_ERROR_CONSTRUCTING_UPGRADE_REQUEST, \
     WS_OPEN_CANCELLED
 
 DEFINE_ENUM(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
@@ -163,11 +169,13 @@ XX**SRS_UWS_01_369: [** When `on_underlying_io_open_complete` is called with `IO
 XX**SRS_UWS_01_402: [** When `on_underlying_io_open_complete` is called with `IO_OPEN_CANCELLED` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_UNDERLYING_IO_OPEN_CANCELLED`. **]**
 XX**SRS_UWS_01_401: [** If `on_underlying_io_open_complete` is called with a NULL context, `on_underlying_io_open_complete` shall do nothing. **]** 
 XX**SRS_UWS_01_371: [** When `on_underlying_io_open_complete` is called with `IO_OPEN_OK` while uws is OPENING (`uws_open` was called), uws shall prepare the WebSockets upgrade request. **]**
+X**SRS_UWS_01_408: [** If constructing of the WebSocket upgrade request fails, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_CONSTRUCTING_UPGRADE_REQUEST`. **]**
 XX**SRS_UWS_01_406: [** If not enough memory can be allocated to construct the WebSocket upgrade request, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_NOT_ENOUGH_MEMORY`. **]**
 XX**SRS_UWS_01_372: [** Once prepared the WebSocket upgrade request shall be sent by calling `xio_send`. **]**
 XX**SRS_UWS_01_373: [** If `xio_send` fails then uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST`. **]**
 **SRS_UWS_01_374: [** When `on_underlying_io_open_complete` is called when the uws instance is already OPEN, an error shall be reported to the user by calling the `on_ws_error` callback that was passed to `uws_open`. **]** 
-**SRS_UWS_01_407: [** When `on_underlying_io_open_complete` is called when the uws instance has send the upgrade request but it is waiting for the response, an error shall be reported to the user by calling the `on_ws_open_complete` with `WS_OPEN_ERROR_MULTIPLE_UNDERLYING_IO_OPEN_EVENTS`. **]**
+XX**SRS_UWS_01_407: [** When `on_underlying_io_open_complete` is called when the uws instance has send the upgrade request but it is waiting for the response, an error shall be reported to the user by calling the `on_ws_open_complete` with `WS_OPEN_ERROR_MULTIPLE_UNDERLYING_IO_OPEN_EVENTS`. **]**
+**SRS_UWS_01_409: [** After any error is indicated by `on_ws_open_complete`, a subsequent `uws_open` shall be possible. **]**
 
 ### on_underlying_io_error
 
