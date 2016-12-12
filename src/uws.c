@@ -181,7 +181,7 @@ void uws_destroy(UWS_HANDLE uws)
 static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_result)
 {
     UWS_HANDLE uws = context;
-    uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR);
+    uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_UNDERLYING_IO_OPEN_ERROR);
     (void)open_result;
 }
 

@@ -1252,7 +1252,7 @@ TEST_FUNCTION(uws_close_after_close_complete_fails)
 
 /* on_underlying_io_open_complete */
 
-/* Tests_SRS_UWS_01_369: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_ERROR` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_ERROR`. ]*/
+/* Tests_SRS_UWS_01_369: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_ERROR` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_UNDERLYING_IO_OPEN_ERROR`. ]*/
 TEST_FUNCTION(on_underlying_io_open_complete_with_ERROR_triggers_the_ws_open_complete_callback_with_ERROR)
 {
     // arrange
@@ -1266,7 +1266,7 @@ TEST_FUNCTION(on_underlying_io_open_complete_with_ERROR_triggers_the_ws_open_com
     (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
     umock_c_reset_all_calls();
 
-    STRICT_EXPECTED_CALL(test_on_ws_open_complete((void*)0x4242, WS_OPEN_ERROR));
+    STRICT_EXPECTED_CALL(test_on_ws_open_complete((void*)0x4242, WS_OPEN_UNDERLYING_IO_OPEN_ERROR));
 
     // act
     g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_ERROR);
