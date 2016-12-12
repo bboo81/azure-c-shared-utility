@@ -1380,6 +1380,7 @@ TEST_FUNCTION(on_underlying_io_open_complete_with_CANCELLED_triggers_the_ws_open
 }
 
 /* Tests_SRS_UWS_01_371: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_OK` while uws is OPENING (`uws_open` was called), uws shall prepare the WebSockets upgrade request. ]*/
+/* Tests_SRS_UWS_01_372: [ Once prepared the WebSocket upgrade request shall be sent by calling `xio_send`. ]*/
 TEST_FUNCTION(on_underlying_io_open_complete_with_OK_prepares_and_sends_the_WebSocket_upgrade_request)
 {
     // arrange
@@ -1428,6 +1429,40 @@ TEST_FUNCTION(when_allocating_memory_for_the_websocket_upgrade_request_fails_the
     EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG))
         .SetReturn(NULL);
     STRICT_EXPECTED_CALL(test_on_ws_open_complete((void*)0x4242, WS_OPEN_ERROR_NOT_ENOUGH_MEMORY));
+
+    // act
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_373: [ If `xio_send` fails then uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST`. ]*/
+TEST_FUNCTION(when_sending_the_upgrade_request_fails_the_error_WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST_is_indicated)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true);
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(xio_send(TEST_IO_HANDLE, IGNORED_PTR_ARG, IGNORED_NUM_ARG, IGNORED_PTR_ARG, IGNORED_PTR_ARG))
+        .IgnoreArgument_on_send_complete()
+        .IgnoreArgument_callback_context()
+        .IgnoreArgument_buffer()
+        .IgnoreArgument_size()
+        .SetReturn(1);
+    STRICT_EXPECTED_CALL(test_on_ws_open_complete((void*)0x4242, WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
 
     // act
     g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);

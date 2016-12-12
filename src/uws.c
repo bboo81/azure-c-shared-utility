@@ -254,7 +254,16 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
             {
                 /* No need to have any send complete here, as we are monitoring the received bytes */
                 /* Codes_SRS_UWS_01_372: [ Once prepared the WebSocket upgrade request shall be sent by calling `xio_send`. ]*/
-                xio_send(uws->underlying_io, upgrade_request, upgrade_request_length, NULL, NULL);
+                if (xio_send(uws->underlying_io, upgrade_request, upgrade_request_length, NULL, NULL) != 0)
+                {
+                    /* Codes_SRS_UWS_01_373: [ If `xio_send` fails then uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST`. ]*/
+                    LogError("Cannot send upgrade request");
+                    uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST);
+                }
+                else
+                {
+
+                }
 
                 free(upgrade_request);
             }

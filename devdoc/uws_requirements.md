@@ -163,9 +163,9 @@ XX**SRS_UWS_01_369: [** When `on_underlying_io_open_complete` is called with `IO
 XX**SRS_UWS_01_402: [** When `on_underlying_io_open_complete` is called with `IO_OPEN_CANCELLED` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_UNDERLYING_IO_OPEN_CANCELLED`. **]**
 XX**SRS_UWS_01_401: [** If `on_underlying_io_open_complete` is called with a NULL context, `on_underlying_io_open_complete` shall do nothing. **]** 
 XX**SRS_UWS_01_371: [** When `on_underlying_io_open_complete` is called with `IO_OPEN_OK` while uws is OPENING (`uws_open` was called), uws shall prepare the WebSockets upgrade request. **]**
-**SRS_UWS_01_406: [** If not enough memory can be allocated to construct the WebSocket upgrade request, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_NOT_ENOUGH_MEMORY`. **]**
-**SRS_UWS_01_372: [** Once prepared the WebSocket upgrade request shall be sent by calling `xio_send`. **]**
-**SRS_UWS_01_373: [** If `xio_send` fails then uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_ERROR`. **]**
+XX**SRS_UWS_01_406: [** If not enough memory can be allocated to construct the WebSocket upgrade request, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_NOT_ENOUGH_MEMORY`. **]**
+XX**SRS_UWS_01_372: [** Once prepared the WebSocket upgrade request shall be sent by calling `xio_send`. **]**
+XX**SRS_UWS_01_373: [** If `xio_send` fails then uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_CANNOT_SEND_UPGRADE_REQUEST`. **]**
 **SRS_UWS_01_374: [** When `on_underlying_io_open_complete` is called when the uws instance is already OPEN, an error shall be reported to the user by calling the `on_ws_error` callback that was passed to `uws_open`. **]** 
 
 ### on_underlying_io_error
