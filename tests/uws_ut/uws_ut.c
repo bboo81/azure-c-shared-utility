@@ -143,6 +143,9 @@ LIST_ITEM_HANDLE my_singlylinkedlist_find(SINGLYLINKEDLIST_HANDLE handle, LIST_M
 
 #include "azure_c_shared_utility/uws.h"
 
+TEST_DEFINE_ENUM_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
+IMPLEMENT_UMOCK_C_ENUM_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
+
 static char* umocktypes_stringify_const_SOCKETIO_CONFIG_ptr(const SOCKETIO_CONFIG** value)
 {
     char* result = NULL;
@@ -251,6 +254,25 @@ MOCK_FUNCTION_END()
 MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_send_frame_complete, void*, context, WS_SEND_FRAME_RESULT, ws_send_frame_result)
 MOCK_FUNCTION_END()
 
+static ON_IO_OPEN_COMPLETE g_on_io_open_complete;
+static void* g_on_io_open_complete_context;
+static ON_BYTES_RECEIVED g_on_bytes_received;
+static void* g_on_bytes_received_context;
+static ON_IO_ERROR g_on_io_error;
+static void* g_on_io_error_context;
+
+static int my_xio_open(XIO_HANDLE xio, ON_IO_OPEN_COMPLETE on_io_open_complete, void* on_io_open_complete_context, ON_BYTES_RECEIVED on_bytes_received, void* on_bytes_received_context, ON_IO_ERROR on_io_error, void* on_io_error_context)
+{
+    (void)xio;
+    g_on_io_open_complete = on_io_open_complete;
+    g_on_io_open_complete_context = on_io_open_complete_context;
+    g_on_bytes_received = on_bytes_received;
+    g_on_bytes_received_context = on_bytes_received_context;
+    g_on_io_error = on_io_error;
+    g_on_io_error_context = on_io_error_context;
+    return 0;
+}
+
 static ON_IO_CLOSE_COMPLETE g_on_io_close_complete;
 static void* g_on_io_close_complete_context;
 
@@ -296,6 +318,7 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_GLOBAL_MOCK_HOOK(gballoc_malloc, my_gballoc_malloc);
     REGISTER_GLOBAL_MOCK_HOOK(gballoc_free, my_gballoc_free);
     REGISTER_GLOBAL_MOCK_HOOK(mallocAndStrcpy_s, my_mallocAndStrcpy_s);
+    REGISTER_GLOBAL_MOCK_HOOK(xio_open, my_xio_open);
     REGISTER_GLOBAL_MOCK_HOOK(xio_close, my_xio_close);
     REGISTER_GLOBAL_MOCK_RETURN(singlylinkedlist_create, TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE);
     REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_remove, my_singlylinkedlist_remove);
@@ -308,6 +331,7 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_GLOBAL_MOCK_RETURN(xio_create, TEST_IO_HANDLE);
     REGISTER_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT);
     REGISTER_TYPE(IO_SEND_RESULT, IO_SEND_RESULT);
+    REGISTER_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT);
     REGISTER_TYPE(const SOCKETIO_CONFIG*, const_SOCKETIO_CONFIG_ptr);
 
     REGISTER_UMOCK_ALIAS_TYPE(SINGLYLINKEDLIST_HANDLE, void*);
@@ -1220,6 +1244,34 @@ TEST_FUNCTION(uws_close_after_close_complete_fails)
 
     // assert
     ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* on_underlying_io_open_complete */
+
+/* Tests_SRS_UWS_01_369: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_ERROR` while uws is OPENING (`uws_open` was called), uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_ERROR`. ]*/
+TEST_FUNCTION(on_underlying_io_open_complete_with_ERROR_triggers_the_ws_open_complete_callback_with_ERROR)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, true);
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(test_on_ws_open_complete((void*)0x4242, WS_OPEN_ERROR));
+
+    // act
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_ERROR);
+
+    // assert
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 
     // cleanup

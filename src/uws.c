@@ -30,6 +30,8 @@ typedef struct UWS_INSTANCE_TAG
     XIO_HANDLE underlying_io;
     char* hostname;
     UWS_STATE uws_state;
+    ON_WS_OPEN_COMPLETE on_ws_open_complete;
+    void* on_ws_open_complete_context;
     ON_WS_CLOSE_COMPLETE on_ws_close_complete;
     void* on_ws_close_complete_context;
 } UWS_INSTANCE;
@@ -144,6 +146,8 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, bool use_ssl)
                     else
                     {
                         result->uws_state = UWS_STATE_CLOSED;
+                        result->on_ws_open_complete = NULL;
+                        result->on_ws_open_complete_context = NULL;
                         result->on_ws_close_complete = NULL;
                         result->on_ws_close_complete_context = NULL;
                     }
@@ -176,7 +180,8 @@ void uws_destroy(UWS_HANDLE uws)
 
 static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_result)
 {
-    (void)context;
+    UWS_HANDLE uws = context;
+    uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_ERROR);
     (void)open_result;
 }
 
@@ -238,6 +243,8 @@ int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_w
             else
             {
                 uws->uws_state = UWS_STATE_OPENING_UNDERLYING_IO;
+                uws->on_ws_open_complete = on_ws_open_complete;
+                uws->on_ws_open_complete_context = on_ws_open_complete_context;
 
                 /* Codes_SRS_UWS_01_026: [ On success, `uws_open` shall return 0. ]*/
                 result = 0;
