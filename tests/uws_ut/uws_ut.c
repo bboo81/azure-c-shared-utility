@@ -144,7 +144,7 @@ LIST_ITEM_HANDLE my_singlylinkedlist_find(SINGLYLINKEDLIST_HANDLE handle, LIST_M
 
 #include "azure_c_shared_utility/uws.h"
 
-static const WS_PROTOCOL protocols[] = { "test_protocol" };
+static const WS_PROTOCOL protocols[] = { { "test_protocol" } };
 
 TEST_DEFINE_ENUM_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
 IMPLEMENT_UMOCK_C_ENUM_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
@@ -523,6 +523,36 @@ TEST_FUNCTION(uws_create_with_non_zero_protocol_count_and_NULL_protocols_fails)
 
     // act
     uws = uws_create("test_host", 81, "333", false, NULL, 1);
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_412: [ If the `protocol` member of any of the items in the `protocols` argument is NULL, then `uws_create` shall fail and return NULL. ]*/
+TEST_FUNCTION(uws_create_with_the_first_protocol_name_NULL_fails)
+{
+    // arrange
+    UWS_HANDLE uws;
+    WS_PROTOCOL NULL_test_protocol[] = { { NULL } };
+
+    // act
+    uws = uws_create("test_host", 81, "333", false, NULL_test_protocol, sizeof(NULL_test_protocol) / sizeof(NULL_test_protocol[0]));
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_412: [ If the `protocol` member of any of the items in the `protocols` argument is NULL, then `uws_create` shall fail and return NULL. ]*/
+TEST_FUNCTION(uws_create_with_the_second_protocol_name_NULL_fails)
+{
+    // arrange
+    UWS_HANDLE uws;
+    WS_PROTOCOL NULL_test_protocol[] = { { "aaa" }, { NULL } };
+
+    // act
+    uws = uws_create("test_host", 81, "333", false, NULL_test_protocol, sizeof(NULL_test_protocol) / sizeof(NULL_test_protocol[0]));
 
     // assert
     ASSERT_IS_NULL(uws);

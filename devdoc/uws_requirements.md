@@ -67,7 +67,7 @@ XX**SRS_UWS_01_403: [** The argument `port` shall be copied for later use. **]**
 XX**SRS_UWS_01_404: [** The argument `resource_name` shall be copied for later use. **]**
 XX**SRS_UWS_01_410: [** The `protocols` argument shall be allowed to be NULL, in which case no protocol is to be specified by the client in the upgrade request. **]**
 XX**SRS_UWS_01_411: [** If `protocol_count` is non zero and `protocols` is NULL then `uws_create` shall fail and return NULL. **]**
-**SRS_UWS_01_412: [** If the `protocol` member of any of the items in the `protocols` argument is NULL, then `uws_create` shall fail and return NULL. **]**
+XX**SRS_UWS_01_412: [** If the `protocol` member of any of the items in the `protocols` argument is NULL, then `uws_create` shall fail and return NULL. **]**
 **SRS_UWS_01_413: [** The protocol information indicated by `protocols` and `protocol_count` shall be copied for later use (for constructing the upgrade request). **]**
 **SRS_UWS_01_414: [** If allocating memory for the copied protocol information fails then `uws_create` shall fail and return NULL. **]**
 XX**SRS_UWS_01_405: [** If allocating memory for the copy of the `resource_name` argument fails, then `uws_create` shall return NULL. **]**
