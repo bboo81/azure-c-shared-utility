@@ -39,7 +39,12 @@ typedef void(*ON_WS_OPEN_COMPLETE)(void* context, WS_OPEN_RESULT ws_open_result)
 typedef void(*ON_WS_CLOSE_COMPLETE)(void* context);
 typedef void(*ON_WS_ERROR)(void* context);
 
-extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl);
+typedef struct WS_PROTOCOL_STRUCT_TAG
+{
+    const char* protocol;
+} WS_PROTOCOL_STRUCT;
+
+extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource, bool use_ssl, WS_PROTOCOL_STRUCT* protocols, size_t protocol_count);
 extern void uws_destroy(UWS_HANDLE uws);
 extern int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_ws_open_complete_context, ON_WS_FRAME_RECEIVED on_ws_frame_received, void* on_ws_frame_received_context, ON_WS_ERROR on_ws_error, void* on_ws_error_context);
 extern int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* on_ws_close_complete_context);
@@ -50,16 +55,21 @@ extern void uws_dowork(UWS_HANDLE uws);
 ### uws_create
 
 ```c
-extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl);
+extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource, bool use_ssl, WS_PROTOCOL_STRUCT* protocols, size_t protocol_count);
 ```
 
 XX**SRS_UWS_01_001: [**`uws_create` shall create an instance of uws and return a non-NULL handle to it.**]**
-XX**SRS_UWS_01_002: [** If the argument `hostname` is NULL then `uws_create` shall return NULL. **]**
+**SRS_UWS_01_002: [** If any of the arguments `hostname` and `resource_name` is NULL then `uws_create` shall return NULL. **]**
 XX**SRS_UWS_01_003: [** If allocating memory for the new uws instance fails then `uws_create` shall return NULL. **]**
 XX**SRS_UWS_01_004: [** The argument `hostname` shall be copied for later use. **]**
 XX**SRS_UWS_01_392: [** If allocating memory for the copy of the `hostname` argument fails, then `uws_create` shall return NULL. **]**
 XX**SRS_UWS_01_403: [** The argument `port` shall be copied for later use. **]**
 XX**SRS_UWS_01_404: [** The argument `resource_name` shall be copied for later use. **]**
+**SRS_UWS_01_410: [** The `protocols` argument shall be allowed to be NULL, in which case no protocol is to be specified by the client in the upgrade request. **]**
+**SRS_UWS_01_411: [** If `protocol_count` is non zero and `protocols` is NULL then `uws_create` shall fail and return NULL. **]**
+**SRS_UWS_01_412: [** If the `protocol` member of any of the items in the `protocols` argument is NULL, then `uws_create` shall fail and return NULL. **]**
+**SRS_UWS_01_413: [** The protocol information indicated by `protocols` and `protocol_count` shall be copied for later use (for constructing the upgrade request). **]**
+**SRS_UWS_01_414: [** If allocating memory for the copied protocol information fails then `uws_create` shall fail and return NULL. **]**
 XX**SRS_UWS_01_405: [** If allocating memory for the copy of the `resource_name` argument fails, then `uws_create` shall return NULL. **]**
 XX**SRS_UWS_01_005: [** If `use_ssl` is 0 then `uws_create` shall obtain the interface used to create a socketio instance by calling `socketio_get_interface_description`. **]**
 XX**SRS_UWS_01_006: [** If `use_ssl` is 1 then `uws_create` shall obtain the interface used to create a tlsio instance by calling `platform_get_default_tlsio`. **]**
