@@ -39,12 +39,12 @@ typedef void(*ON_WS_OPEN_COMPLETE)(void* context, WS_OPEN_RESULT ws_open_result)
 typedef void(*ON_WS_CLOSE_COMPLETE)(void* context);
 typedef void(*ON_WS_ERROR)(void* context);
 
-typedef struct WS_PROTOCOL_STRUCT_TAG
+typedef struct WS_PROTOCOL_TAG
 {
     const char* protocol;
-} WS_PROTOCOL_STRUCT;
+} WS_PROTOCOL;
 
-extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl, WS_PROTOCOL_STRUCT* protocols, size_t protocol_count);
+extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl, const WS_PROTOCOL* protocols, size_t protocol_count);
 extern void uws_destroy(UWS_HANDLE uws);
 extern int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_ws_open_complete_context, ON_WS_FRAME_RECEIVED on_ws_frame_received, void* on_ws_frame_received_context, ON_WS_ERROR on_ws_error, void* on_ws_error_context);
 extern int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* on_ws_close_complete_context);
@@ -55,11 +55,11 @@ extern void uws_dowork(UWS_HANDLE uws);
 ### uws_create
 
 ```c
-extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl, WS_PROTOCOL_STRUCT* protocols, size_t protocol_count);
+extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl, const WS_PROTOCOL* protocols, size_t protocol_count);
 ```
 
 XX**SRS_UWS_01_001: [**`uws_create` shall create an instance of uws and return a non-NULL handle to it.**]**
-**SRS_UWS_01_002: [** If any of the arguments `hostname` and `resource_name` is NULL then `uws_create` shall return NULL. **]**
+XX**SRS_UWS_01_002: [** If any of the arguments `hostname` and `resource_name` is NULL then `uws_create` shall return NULL. **]**
 XX**SRS_UWS_01_003: [** If allocating memory for the new uws instance fails then `uws_create` shall return NULL. **]**
 XX**SRS_UWS_01_004: [** The argument `hostname` shall be copied for later use. **]**
 XX**SRS_UWS_01_392: [** If allocating memory for the copy of the `hostname` argument fails, then `uws_create` shall return NULL. **]**

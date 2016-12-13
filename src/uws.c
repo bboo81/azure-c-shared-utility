@@ -40,7 +40,7 @@ typedef struct UWS_INSTANCE_TAG
     void* on_ws_close_complete_context;
 } UWS_INSTANCE;
 
-UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl, WS_PROTOCOL_STRUCT* protocols, size_t protocol_count)
+UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl, const WS_PROTOCOL* protocols, size_t protocol_count)
 {
     UWS_HANDLE result;
 
