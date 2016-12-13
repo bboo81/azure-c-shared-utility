@@ -25,13 +25,19 @@ typedef enum UWS_STATE_TAG
     UWS_STATE_ERROR
 } UWS_STATE;
 
+typedef struct WS_INSTANCE_PROTOCOL_TAG
+{
+    char* protocol;
+} WS_INSTANCE_PROTOCOL;
+
 typedef struct UWS_INSTANCE_TAG
 {
     SINGLYLINKEDLIST_HANDLE pending_sends;
     XIO_HANDLE underlying_io;
     char* hostname;
     char* resource_name;
-    char* protocol;
+    WS_INSTANCE_PROTOCOL* protocols;
+    size_t protocol_count;
     int port;
     UWS_STATE uws_state;
     ON_WS_OPEN_COMPLETE on_ws_open_complete;
@@ -170,11 +176,60 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resou
                             /* Codes_SRS_UWS_01_403: [ The argument `port` shall be copied for later use. ]*/
                             result->port = port;
 
-                            result->protocol = NULL;
                             result->on_ws_open_complete = NULL;
                             result->on_ws_open_complete_context = NULL;
                             result->on_ws_close_complete = NULL;
                             result->on_ws_close_complete_context = NULL;
+
+                            result->protocol_count = protocol_count;
+
+                            /* Codes_SRS_UWS_01_410: [ The `protocols` argument shall be allowed to be NULL, in which case no protocol is to be specified by the client in the upgrade request. ]*/
+                            if (protocols != NULL)
+                            {
+                                result->protocols = (WS_INSTANCE_PROTOCOL*)malloc(sizeof(WS_INSTANCE_PROTOCOL) * protocol_count);
+                                if (result->protocols == NULL)
+                                {
+                                    xio_destroy(result->underlying_io);
+                                    singlylinkedlist_destroy(result->pending_sends);
+                                    free(result->resource_name);
+                                    free(result->hostname);
+                                    free(result);
+                                    result = NULL;
+                                }
+                                else
+                                {
+                                    size_t i;
+
+                                    for (i = 0; i < protocol_count; i++)
+                                    {
+                                        if (mallocAndStrcpy_s(&result->protocols[i].protocol, protocols[i].protocol) != 0)
+                                        {
+                                            break;
+                                        }
+                                    }
+
+                                    if (i < protocol_count)
+                                    {
+                                        size_t j;
+
+                                        for (j = 0; j < i; j++)
+                                        {
+                                            free(result->protocols[j].protocol);
+                                        }
+                                        free(result->protocols);
+                                        xio_destroy(result->underlying_io);
+                                        singlylinkedlist_destroy(result->pending_sends);
+                                        free(result->resource_name);
+                                        free(result->hostname);
+                                        free(result);
+                                        result = NULL;
+                                    }
+                                    else
+                                    {
+                                        result->protocol_count = protocol_count;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -194,6 +249,17 @@ void uws_destroy(UWS_HANDLE uws)
     }
     else
     {
+        size_t i;
+
+        if (uws->protocol_count > 0)
+        {
+            for (i = 0; i < uws->protocol_count; i++)
+            {
+                free(uws->protocols[i].protocol);
+            }
+            free(uws->protocols);
+        }
+
         /* Codes_SRS_UWS_01_019: [ `uws_destroy` shall free all resources associated with the uws instance. ]*/
         /* Codes_SRS_UWS_01_023: [ `uws_destroy` shall destroy the underlying IO created in `uws_create` by calling `xio_destroy`. ]*/
         xio_destroy(uws->underlying_io);
@@ -267,7 +333,7 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
                     uws->resource_name,
                     uws->hostname,
                     uws->port,
-                    uws->protocol);
+                    "");
                 if (upgrade_request_length < 0)
                 {
                     /* Codes_SRS_UWS_01_408: [ If constructing of the WebSocket upgrade request fails, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_CONSTRUCTING_UPGRADE_REQUEST`. ]*/

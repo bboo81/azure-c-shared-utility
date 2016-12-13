@@ -407,6 +407,9 @@ TEST_FUNCTION(uws_create_with_valid_args_no_ssl_succeeds)
     STRICT_EXPECTED_CALL(socketio_get_interface_description());
     STRICT_EXPECTED_CALL(xio_create(TEST_SOCKET_IO_INTERFACE_DESCRIPTION, &socketio_config))
         .IgnoreArgument_io_create_parameters();
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_protocol"))
+        .IgnoreArgument_destination();
 
 	// act
     uws = uws_create("test_host", 80, "111", false, protocols, sizeof(protocols) / sizeof(protocols[0]));
@@ -465,9 +468,44 @@ TEST_FUNCTION(uws_create_with_valid_args_no_ssl_port_different_than_80_succeeds)
     STRICT_EXPECTED_CALL(socketio_get_interface_description());
     STRICT_EXPECTED_CALL(xio_create(TEST_SOCKET_IO_INTERFACE_DESCRIPTION, &socketio_config))
         .IgnoreArgument_io_create_parameters();
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_protocol"))
+        .IgnoreArgument_destination();
 
     // act
     uws = uws_create("test_host", 81, "333", false, protocols, sizeof(protocols) / sizeof(protocols[0]));
+
+    // assert
+    ASSERT_IS_NOT_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_410: [ The `protocols` argument shall be allowed to be NULL, in which case no protocol is to be specified by the client in the upgrade request. ]*/
+TEST_FUNCTION(uws_create_with_NULL_protocols_succeeds)
+{
+    // arrange
+    SOCKETIO_CONFIG socketio_config;
+    UWS_HANDLE uws;
+
+    socketio_config.accepted_socket = NULL;
+    socketio_config.hostname = "test_host";
+    socketio_config.port = 81;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "333"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(singlylinkedlist_create());
+    STRICT_EXPECTED_CALL(socketio_get_interface_description());
+    STRICT_EXPECTED_CALL(xio_create(TEST_SOCKET_IO_INTERFACE_DESCRIPTION, &socketio_config))
+        .IgnoreArgument_io_create_parameters();
+
+    // act
+    uws = uws_create("test_host", 81, "333", false, NULL, 0);
 
     // assert
     ASSERT_IS_NOT_NULL(uws);
@@ -664,6 +702,9 @@ TEST_FUNCTION(uws_create_with_valid_args_ssl_succeeds)
     STRICT_EXPECTED_CALL(platform_get_default_tlsio());
     STRICT_EXPECTED_CALL(xio_create(TEST_TLS_IO_INTERFACE_DESCRIPTION, &tlsio_config))
         .IgnoreArgument_io_create_parameters();
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_protocol"))
+        .IgnoreArgument_destination();
 
     // act
     uws = uws_create("test_host", 443, "test_resource/23", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
@@ -698,6 +739,9 @@ TEST_FUNCTION(uws_create_with_valid_args_ssl_port_different_than_443_succeeds)
     STRICT_EXPECTED_CALL(platform_get_default_tlsio());
     STRICT_EXPECTED_CALL(xio_create(TEST_TLS_IO_INTERFACE_DESCRIPTION, &tlsio_config))
         .IgnoreArgument_io_create_parameters();
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_protocol"))
+        .IgnoreArgument_destination();
 
     // act
     uws = uws_create("test_host", 444, "test_resource/23", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
@@ -758,6 +802,8 @@ TEST_FUNCTION(uws_destroy_fress_the_resources)
     uws = uws_create("test_host", 444, "aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
     umock_c_reset_all_calls();
 
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
     STRICT_EXPECTED_CALL(xio_destroy(TEST_IO_HANDLE));
     STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
