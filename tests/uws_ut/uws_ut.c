@@ -417,13 +417,26 @@ TEST_FUNCTION(uws_create_with_valid_args_no_ssl_succeeds)
     uws_destroy(uws);
 }
 
-/* Tests_SRS_UWS_01_002: [ If the argument `hostname` is NULL then `uws_create` shall return NULL. ]*/
+/* Tests_SRS_UWS_01_002: [ If any of the arguments `hostname` and `resource_name` is NULL then `uws_create` shall return NULL. ]*/
 TEST_FUNCTION(uws_create_with_NULL_hostname_fails)
 {
     // arrange
 
     // act
     UWS_HANDLE uws = uws_create(NULL, 80, "222", false, NULL, 0);
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_002: [ If any of the arguments `hostname` and `resource_name` is NULL then `uws_create` shall return NULL. ]*/
+TEST_FUNCTION(uws_create_with_NULL_resource_name_fails)
+{
+    // arrange
+
+    // act
+    UWS_HANDLE uws = uws_create("testhost", 80, NULL, false, NULL, 0);
 
     // assert
     ASSERT_IS_NULL(uws);

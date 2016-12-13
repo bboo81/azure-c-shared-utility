@@ -47,10 +47,11 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resou
     (void)protocols;
     (void)protocol_count;
 
-    /* Codes_SRS_UWS_01_002: [ If the argument `hostname` is NULL then `uws_create` shall return NULL. ]*/
-    if (hostname == NULL)
+    /* Codes_SRS_UWS_01_002: [ If any of the arguments `hostname` and `resource_name` is NULL then `uws_create` shall return NULL. ]*/
+    if ((hostname == NULL) ||
+        (resource_name == NULL))
     {
-        LogError("NULL hostname");
+        LogError("NULL argument, hostname = %p, resource_name = %p", hostname, resource_name);
         result = NULL;
     }
     else
