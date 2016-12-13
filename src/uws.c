@@ -50,14 +50,13 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resou
 {
     UWS_HANDLE result;
 
-    (void)protocols;
-    (void)protocol_count;
-
     /* Codes_SRS_UWS_01_002: [ If any of the arguments `hostname` and `resource_name` is NULL then `uws_create` shall return NULL. ]*/
     if ((hostname == NULL) ||
-        (resource_name == NULL))
+        (resource_name == NULL) ||
+        /* Codes_SRS_UWS_01_411: [ If `protocol_count` is non zero and `protocols` is NULL then `uws_create` shall fail and return NULL. ]*/
+        ((protocols == NULL) && (protocol_count > 0)))
     {
-        LogError("NULL argument, hostname = %p, resource_name = %p", hostname, resource_name);
+        LogError("Invalid arguments: hostname = %p, resource_name = %p, protocols = %p, protocol_count = %zu", hostname, resource_name, protocols, protocol_count);
         result = NULL;
     }
     else

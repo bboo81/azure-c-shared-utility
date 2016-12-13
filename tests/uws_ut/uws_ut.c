@@ -515,6 +515,20 @@ TEST_FUNCTION(uws_create_with_NULL_protocols_succeeds)
     uws_destroy(uws);
 }
 
+/* Tests_SRS_UWS_01_411: [ If `protocol_count` is non zero and `protocols` is NULL then `uws_create` shall fail and return NULL. ]*/
+TEST_FUNCTION(uws_create_with_non_zero_protocol_count_and_NULL_protocols_fails)
+{
+    // arrange
+    UWS_HANDLE uws;
+
+    // act
+    uws = uws_create("test_host", 81, "333", false, NULL, 1);
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
 /* Tests_SRS_UWS_01_003: [ If allocating memory for the new uws instance fails then `uws_create` shall return NULL. ]*/
 TEST_FUNCTION(when_allocating_memory_for_the_new_uws_instance_fails_then_uws_create_fails)
 {
