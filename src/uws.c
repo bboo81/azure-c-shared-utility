@@ -30,7 +30,8 @@ typedef struct UWS_INSTANCE_TAG
     SINGLYLINKEDLIST_HANDLE pending_sends;
     XIO_HANDLE underlying_io;
     char* hostname;
-    char* resource;
+    char* resource_name;
+    char* protocol;
     int port;
     UWS_STATE uws_state;
     ON_WS_OPEN_COMPLETE on_ws_open_complete;
@@ -39,7 +40,7 @@ typedef struct UWS_INSTANCE_TAG
     void* on_ws_close_complete_context;
 } UWS_INSTANCE;
 
-UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource, bool use_ssl)
+UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl)
 {
     UWS_HANDLE result;
 
@@ -70,8 +71,8 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resou
             }
             else
             {
-                /* Codes_SRS_UWS_01_404: [ The argument `resource` shall be copied for later use. ]*/
-                if (mallocAndStrcpy_s(&result->resource, resource) != 0)
+                /* Codes_SRS_UWS_01_404: [ The argument `resource_name` shall be copied for later use. ]*/
+                if (mallocAndStrcpy_s(&result->resource_name, resource_name) != 0)
                 {
                     /* Codes_SRS_UWS_01_405: [ If allocating memory for the copy of the `resource` argument fails, then `uws_create` shall return NULL. ]*/
                     LogError("Could not copy resource.");
@@ -87,7 +88,7 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resou
                     {
                         /* Codes_SRS_UWS_01_018: [ If `singlylinkedlist_create` fails then `uws_create` shall fail and return NULL. ]*/
                         LogError("Could not allocate pending send frames list");
-                        free(result->resource);
+                        free(result->resource_name);
                         free(result->hostname);
                         free(result);
                         result = NULL;
@@ -154,7 +155,7 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resou
                         {
                             /* Tests_SRS_UWS_01_016: [ If `xio_create` fails, then `uws_create` shall fail and return NULL. ]*/
                             singlylinkedlist_destroy(result->pending_sends);
-                            free(result->resource);
+                            free(result->resource_name);
                             free(result->hostname);
                             free(result);
                             result = NULL;
@@ -165,6 +166,7 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resou
                             /* Codes_SRS_UWS_01_403: [ The argument `port` shall be copied for later use. ]*/
                             result->port = port;
 
+                            result->protocol = NULL;
                             result->on_ws_open_complete = NULL;
                             result->on_ws_open_complete_context = NULL;
                             result->on_ws_close_complete = NULL;
@@ -193,7 +195,7 @@ void uws_destroy(UWS_HANDLE uws)
         xio_destroy(uws->underlying_io);
         /* Codes_SRS_UWS_01_024: [ `uws_destroy` shall free the list used to track the pending sends by calling `singlylinkedlist_destroy`. ]*/
         singlylinkedlist_destroy(uws->pending_sends);
-        free(uws->resource);
+        free(uws->resource_name);
         free(uws->hostname);
         free(uws);
     }
@@ -248,16 +250,20 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
                 char* upgrade_request;
 
                 /* Codes_SRS_UWS_01_371: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_OK` while uws is OPENING (`uws_open` was called), uws shall prepare the WebSockets upgrade request. ]*/
-                const char upgrade_request_format[] = "GET /$iothub/websocket HTTP/1.1\r\n"
-                    "Host: %s:443\r\n"
+                const char upgrade_request_format[] = "GET %s HTTP/1.1\r\n"
+                    "Host: %s:%d\r\n"
                     "Upgrade: websocket\r\n"
                     "Connection: Upgrade\r\n"
                     "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
-                    "Sec-WebSocket-Protocol: AMQPWSB10\r\n"
+                    "Sec-WebSocket-Protocol: %s\r\n"
                     "Sec-WebSocket-Version: 13\r\n"
                     "\r\n";
 
-                upgrade_request_length = snprintf(NULL, 0, upgrade_request_format, uws->resource, uws->hostname, uws->port);
+                upgrade_request_length = snprintf(NULL, 0, upgrade_request_format,
+                    uws->resource_name,
+                    uws->hostname,
+                    uws->port,
+                    uws->protocol);
                 if (upgrade_request_length < 0)
                 {
                     /* Codes_SRS_UWS_01_408: [ If constructing of the WebSocket upgrade request fails, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_CONSTRUCTING_UPGRADE_REQUEST`. ]*/

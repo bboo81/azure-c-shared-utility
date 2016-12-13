@@ -39,7 +39,7 @@ typedef void(*ON_WS_OPEN_COMPLETE)(void* context, WS_OPEN_RESULT ws_open_result)
 typedef void(*ON_WS_CLOSE_COMPLETE)(void* context);
 typedef void(*ON_WS_ERROR)(void* context);
 
-extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource, bool use_ssl);
+extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl);
 extern void uws_destroy(UWS_HANDLE uws);
 extern int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_ws_open_complete_context, ON_WS_FRAME_RECEIVED on_ws_frame_received, void* on_ws_frame_received_context, ON_WS_ERROR on_ws_error, void* on_ws_error_context);
 extern int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* on_ws_close_complete_context);
@@ -50,7 +50,7 @@ extern void uws_dowork(UWS_HANDLE uws);
 ### uws_create
 
 ```c
-extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource, bool use_ssl);
+extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl);
 ```
 
 XX**SRS_UWS_01_001: [**`uws_create` shall create an instance of uws and return a non-NULL handle to it.**]**
@@ -59,8 +59,8 @@ XX**SRS_UWS_01_003: [** If allocating memory for the new uws instance fails then
 XX**SRS_UWS_01_004: [** The argument `hostname` shall be copied for later use. **]**
 XX**SRS_UWS_01_392: [** If allocating memory for the copy of the `hostname` argument fails, then `uws_create` shall return NULL. **]**
 XX**SRS_UWS_01_403: [** The argument `port` shall be copied for later use. **]**
-XX**SRS_UWS_01_404: [** The argument `resource` shall be copied for later use. **]**
-XX**SRS_UWS_01_405: [** If allocating memory for the copy of the `resource` argument fails, then `uws_create` shall return NULL. **]**
+XX**SRS_UWS_01_404: [** The argument `resource_name` shall be copied for later use. **]**
+XX**SRS_UWS_01_405: [** If allocating memory for the copy of the `resource_name` argument fails, then `uws_create` shall return NULL. **]**
 XX**SRS_UWS_01_005: [** If `use_ssl` is 0 then `uws_create` shall obtain the interface used to create a socketio instance by calling `socketio_get_interface_description`. **]**
 XX**SRS_UWS_01_006: [** If `use_ssl` is 1 then `uws_create` shall obtain the interface used to create a tlsio instance by calling `platform_get_default_tlsio`. **]**
 XX**SRS_UWS_01_007: [** If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. **]** 

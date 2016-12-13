@@ -385,7 +385,7 @@ TEST_FUNCTION_CLEANUP(method_cleanup)
 /* Tests_SRS_UWS_01_012: [ - `port` set to the `port` argument passed to `uws_create`. ]*/
 /* Tests_SRS_UWS_01_004: [ The argument `hostname` shall be copied for later use. ]*/
 /* Tests_SRS_UWS_01_403: [ The argument `port` shall be copied for later use. ]*/
-/* Tests_SRS_UWS_01_404: [ The argument `resource` shall be copied for later use. ]*/
+/* Tests_SRS_UWS_01_404: [ The argument `resource_name` shall be copied for later use. ]*/
 TEST_FUNCTION(uws_create_with_valid_args_no_ssl_succeeds)
 {
 	// arrange
@@ -507,8 +507,8 @@ TEST_FUNCTION(when_allocating_memory_for_the_hostname_copy_fails_then_uws_create
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 }
 
-/* Tests_SRS_UWS_01_405: [ If allocating memory for the copy of the `resource` argument fails, then `uws_create` shall return NULL. ]*/
-TEST_FUNCTION(when_allocating_memory_for_the_resource_copy_fails_then_uws_create_fails)
+/* Tests_SRS_UWS_01_405: [ If allocating memory for the copy of the `resource_name` argument fails, then `uws_create` shall return NULL. ]*/
+TEST_FUNCTION(when_allocating_memory_for_the_resource_name_copy_fails_then_uws_create_fails)
 {
     // arrange
     SOCKETIO_CONFIG socketio_config;
