@@ -163,6 +163,8 @@ LIST_ITEM_HANDLE my_singlylinkedlist_find(SINGLYLINKEDLIST_HANDLE handle, LIST_M
 #include "azure_c_shared_utility/gballoc.h"
 #include "azure_c_shared_utility/socketio.h"
 #include "azure_c_shared_utility/platform.h"
+#include "azure_c_shared_utility/uws_frame.h"
+#include "azure_c_shared_utility/uws_frame_decoder.h"
 
 #undef ENABLE_MOCKS
 
