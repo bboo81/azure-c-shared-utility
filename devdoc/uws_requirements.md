@@ -195,12 +195,15 @@ XX**SRS_UWS_01_409: [** After any error is indicated by `on_ws_open_complete`, a
 
 ### on_underlying_io_bytes_received
 
-**SRS_UWS_01_378: [** When `on_underlying_io_bytes_received` is called while the uws is OPENING, the received bytes shall be accumulated in order to attempt parsing the WebSocket Upgrade response. **]**
-**SRS_UWS_01_379: [** If allocating memory for accumulating the bytes fails, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_ERROR`. **]**
-**SRS_UWS_01_380: [** If an WebSocket Upgrade request can be parsed from the accumulated bytes, the status shall be read from the WebSocket upgrade response. **]**
-**SRS_UWS_01_381: [** If the status is 101, uws shall be considered OPEN and this shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_OK`. **]**
-**SRS_UWS_01_382: [** If a negative status is decoded from the WebSocket upgrade request, an error shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_ERROR`. **]**
-**SRS_UWS_01_383: [** If the WebSocket upgrade request cannot be decoded an error shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_ERROR`. **]**
+XX**SRS_UWS_01_415: [** If called with a NULL `context` argument, `on_underlying_io_bytes_received` shall do nothing. **]**
+XX**SRS_UWS_01_416: [** If called with NULL `buffer` or zero `size` and the state of the iws is OPENING, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_INVALID_BYTES_RECEIVED_ARGUMENTS`. **]**
+XX**SRS_UWS_01_378: [** When `on_underlying_io_bytes_received` is called while the uws is OPENING, the received bytes shall be accumulated in order to attempt parsing the WebSocket Upgrade response. **]**
+XX**SRS_UWS_01_417: [** When `on_underlying_io_bytes_received` is called while OPENING but before the `on_underlying_io_open_complete` has been called, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_BYTES_RECEIVED_BEFORE_UNDERLYING_OPEN`. **]**
+XX**SRS_UWS_01_379: [** If allocating memory for accumulating the bytes fails, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_NOT_ENOUGH_MEMORY`. **]**
+XX**SRS_UWS_01_380: [** If an WebSocket Upgrade request can be parsed from the accumulated bytes, the status shall be read from the WebSocket upgrade response. **]**
+X**SRS_UWS_01_381: [** If the status is 101, uws shall be considered OPEN and this shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_OK`. **]**
+**SRS_UWS_01_382: [** If a negative status is decoded from the WebSocket upgrade request, an error shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_BAD_RESPONSE_STATUS`. **]**
+**SRS_UWS_01_383: [** If the WebSocket upgrade request cannot be decoded an error shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_BAD_UPGRADE_RESPONSE`. **]**
 **SRS_UWS_01_384: [** Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames. **]**
 **SRS_UWS_01_385: [** If the state of the uws instance is OPEN, the received bytes shall be used for decoding WebSocket frames. **]**
 **SRS_UWS_01_386: [** When a WebSocket frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. **]**

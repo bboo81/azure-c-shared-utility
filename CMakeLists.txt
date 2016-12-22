@@ -366,6 +366,8 @@ if(${use_wsio})
     set(source_h_files ${source_h_files}
         ./inc/azure_c_shared_utility/wsio.h
         ./inc/azure_c_shared_utility/uws.h
+        ./inc/azure_c_shared_utility/uws_frame.h
+        ./inc/azure_c_shared_utility/uws_frame_decoder.h
     )
     set(source_c_files ${source_c_files}
         ./src/wsio.c
