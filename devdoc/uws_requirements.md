@@ -104,7 +104,8 @@ XX**SRS_UWS_01_024: [** `uws_destroy` shall free the list used to track the pend
 ```c
 extern int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_ws_open_complete_context, ON_WS_FRAME_RECEIVED on_ws_frame_received, void* on_ws_frame_received_context, ON_WS_ERROR on_ws_error, void* on_ws_error_context);
 ```
-
+X**SRS_UWS_01_418: [** `uws_open` shall create a new WebSocket frame decoder by calling `uws_frame_decoder_create` and passing to it the `on_frame_decoded` callback. **]**
+**SRS_UWS_01_420: [** If `uws_frame_decoder_create` fails then `uws_open` shall fail and return a non-zero value. **]**
 XX**SRS_UWS_01_025: [** `uws_open` shall open the underlying IO by calling `xio_open` and providing the IO handle created in `uws_create` as argument. **]**
 XX**SRS_UWS_01_367: [** The callbacks `on_underlying_io_open_complete`, `on_underlying_io_bytes_received` and `on_underlying_io_error` shall be passed as arguments to `xio_open`. **]**
 XX**SRS_UWS_01_026: [** On success, `uws_open` shall return 0. **]**
@@ -121,6 +122,7 @@ extern int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, 
 ```
 
 XX**SRS_UWS_01_029: [** `uws_close` shall close the uws instance connection if an open action is either pending or has completed successfully (if the IO is open). **]**
+**SRS_UWS_01_419: [** `uws_close` shall destroy the WebSocket frame decoder created in `uws_open` by calling `uws_frame_decoder_destroy`. **]**
 XX**SRS_UWS_01_396: [** On success `uws_close` shall return 0. **]** 
 XX**SRS_UWS_01_030: [** if `uws` is NULL, `uws_close` shall return a non-zero value. **]**
 XX**SRS_UWS_01_399: [** `on_ws_close_complete` and `on_ws_close_complete_context` shall be saved and the callback `on_ws_close_complete` shall be triggered when the close is complete. **]** 
@@ -204,7 +206,7 @@ XX**SRS_UWS_01_380: [** If an WebSocket Upgrade request can be parsed from the a
 X**SRS_UWS_01_381: [** If the status is 101, uws shall be considered OPEN and this shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_OK`. **]**
 **SRS_UWS_01_382: [** If a negative status is decoded from the WebSocket upgrade request, an error shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_BAD_RESPONSE_STATUS`. **]**
 **SRS_UWS_01_383: [** If the WebSocket upgrade request cannot be decoded an error shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_BAD_UPGRADE_RESPONSE`. **]**
-**SRS_UWS_01_384: [** Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames. **]**
+**SRS_UWS_01_384: [** Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames by passing them to `uws_frame_decoder_decode`. **]**
 **SRS_UWS_01_385: [** If the state of the uws instance is OPEN, the received bytes shall be used for decoding WebSocket frames. **]**
 **SRS_UWS_01_386: [** When a WebSocket frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. **]**
 

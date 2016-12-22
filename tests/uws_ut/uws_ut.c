@@ -18,6 +18,8 @@
 #include "azure_c_shared_utility/crt_abstractions.h"
 #include "azure_c_shared_utility/singlylinkedlist.h"
 #include "azure_c_shared_utility/tlsio.h"
+#include "azure_c_shared_utility/uws_frame.h"
+#include "azure_c_shared_utility/uws_frame_decoder.h"
 
 TEST_DEFINE_ENUM_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT_VALUES);
 IMPLEMENT_UMOCK_C_ENUM_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT_VALUES);
@@ -29,6 +31,7 @@ static size_t list_item_count = 0;
 static const SINGLYLINKEDLIST_HANDLE TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE = (SINGLYLINKEDLIST_HANDLE)0x4242;
 static const LIST_ITEM_HANDLE TEST_LIST_ITEM_HANDLE = (LIST_ITEM_HANDLE)0x4243;
 static const XIO_HANDLE TEST_IO_HANDLE = (XIO_HANDLE)0x4244;
+static const UWS_FRAME_DECODER_HANDLE TEST_UWS_FRAME_DECODER = (UWS_FRAME_DECODER_HANDLE)0x4245;
 
 static size_t currentmalloc_call;
 static size_t whenShallmalloc_fail;
@@ -163,8 +166,6 @@ LIST_ITEM_HANDLE my_singlylinkedlist_find(SINGLYLINKEDLIST_HANDLE handle, LIST_M
 #include "azure_c_shared_utility/gballoc.h"
 #include "azure_c_shared_utility/socketio.h"
 #include "azure_c_shared_utility/platform.h"
-#include "azure_c_shared_utility/uws_frame.h"
-#include "azure_c_shared_utility/uws_frame_decoder.h"
 
 #undef ENABLE_MOCKS
 
@@ -359,6 +360,7 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_GLOBAL_MOCK_RETURN(socketio_get_interface_description, TEST_SOCKET_IO_INTERFACE_DESCRIPTION);
     REGISTER_GLOBAL_MOCK_RETURN(platform_get_default_tlsio, TEST_TLS_IO_INTERFACE_DESCRIPTION);
     REGISTER_GLOBAL_MOCK_RETURN(xio_create, TEST_IO_HANDLE);
+    REGISTER_GLOBAL_MOCK_RETURN(uws_frame_decoder_create, TEST_UWS_FRAME_DECODER);
     REGISTER_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT);
     REGISTER_TYPE(IO_SEND_RESULT, IO_SEND_RESULT);
     REGISTER_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT);
@@ -373,6 +375,8 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_UMOCK_ALIAS_TYPE(ON_IO_ERROR, void*);
     REGISTER_UMOCK_ALIAS_TYPE(ON_IO_CLOSE_COMPLETE, void*);
     REGISTER_UMOCK_ALIAS_TYPE(ON_SEND_COMPLETE, void*);
+    REGISTER_UMOCK_ALIAS_TYPE(UWS_FRAME_DECODER_HANDLE, void*);
+    REGISTER_UMOCK_ALIAS_TYPE(ON_WS_FRAME_DECODED, void*);
 }
 
 TEST_SUITE_CLEANUP(suite_cleanup)
@@ -2111,7 +2115,7 @@ TEST_FUNCTION(when_all_but_1_bytes_are_received_from_the_response_no_open_comple
     }
 }
 
-/* Tests_SRS_UWS_01_384: [ Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames. ]*/
+/* Tests_SRS_UWS_01_384: [ Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames by passing them to `uws_frame_decoder_decode`. ]*/
 TEST_FUNCTION(when_1_extra_byte_is_received_the_open_complete_is_properly_indicated_and_the_extra_byte_is_passed_to_frame_decoder)
 {
     // arrange
@@ -2125,16 +2129,46 @@ TEST_FUNCTION(when_1_extra_byte_is_received_the_open_complete_is_properly_indica
     uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
     (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
     g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
-    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, 1);
     umock_c_reset_all_calls();
 
-    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG))
-        .SetReturn(NULL);
-    STRICT_EXPECTED_CALL(test_on_ws_open_complete((void*)0x4242, WS_OPEN_ERROR_NOT_ENOUGH_MEMORY));
-    STRICT_EXPECTED_CALL(xio_close(TEST_IO_HANDLE, NULL, NULL));
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_open_complete((void*)0x4242, WS_OPEN_OK));
+    STRICT_EXPECTED_CALL(uws_frame_decoder_decode(TEST_UWS_FRAME_DECODER, IGNORED_PTR_ARG, 1))
+        .ValidateArgumentBuffer(2, test_upgrade_response + sizeof(test_upgrade_response) - 1, 1);
 
     // act
-    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response + 1, 1);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_384: [ Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames by passing them to `uws_frame_decoder_decode`. ]*/
+TEST_FUNCTION(when_2_extra_byte_is_received_the_open_complete_is_properly_indicated_and_the_extra_byte_is_passed_to_frame_decoder)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\nAB";
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_open_complete((void*)0x4242, WS_OPEN_OK));
+    STRICT_EXPECTED_CALL(uws_frame_decoder_decode(TEST_UWS_FRAME_DECODER, IGNORED_PTR_ARG, 1))
+        .ValidateArgumentBuffer(2, test_upgrade_response + sizeof(test_upgrade_response) - 2, 2);
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
 
     // assert
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
