@@ -572,6 +572,7 @@ static void on_underlying_io_bytes_received(void* context, const unsigned char* 
                     {
                         unsigned char has_error = 0;
 
+                        /* Codes_SRS_UWS_01_160: [ Defines whether the "Payload data" is masked. ]*/
                         if ((uws->received_bytes[1] & 0x80) != 0)
                         {
                             /* Codes_SRS_UWS_01_144: [ A client MUST close a connection if it detects a masked frame. ]*/

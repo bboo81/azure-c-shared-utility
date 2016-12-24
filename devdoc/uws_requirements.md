@@ -603,7 +603,7 @@ XX**SRS_UWS_01_419: [** If there is an error decoding the WebSocket frame, an er
    (Note that **SRS_UWS_01_141: [** masking is done whether or not the WebSocket Protocol is running over TLS. **]**)
    The server MUST close the connection upon receiving a frame that is not masked.
    **SRS_UWS_01_142: [** In this case, a server MAY send a Close frame with a status code of 1002 (protocol error) as defined in Section 7.4.1. **]**
-   **SRS_UWS_01_143: [** A server MUST NOT mask any frames that it sends to the client. **]**
+   A server MUST NOT mask any frames that it sends to the client.
    XX**SRS_UWS_01_144: [** A client MUST close a connection if it detects a masked frame. **]**
    XX**SRS_UWS_01_145: [** In this case, it MAY use the status code 1002 (protocol error) as defined in Section 7.4.1. (These rules might be relaxed in a future specification.) **]**
 
@@ -674,7 +674,7 @@ XX**SRS_UWS_01_419: [** If there is an error decoding the WebSocket frame, an er
 
    Mask:  1 bit
 
-      **SRS_UWS_01_160: [** Defines whether the "Payload data" is masked. **]**
+      XX**SRS_UWS_01_160: [** Defines whether the "Payload data" is masked. **]**
       **SRS_UWS_01_161: [** If set to 1, a masking key is present in masking-key, and this is used to unmask the "Payload data" as per Section 5.3. **]**
       **SRS_UWS_01_162: [** All frames sent from client to server have this bit set to 1. **]**
 

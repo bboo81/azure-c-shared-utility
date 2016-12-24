@@ -2878,8 +2878,51 @@ TEST_FUNCTION(when_a_complete_frame_is_received_together_with_the_upgrade_reques
     uws_destroy(uws);
 }
 
+/* Tests_SRS_UWS_01_384: [ Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames ]*/
+TEST_FUNCTION(when_2_complete_frames_are_received_together_with_the_upgrade_request_the_frames_are_indicated_as_received)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    size_t received_data_length = sizeof(test_upgrade_response) + 4;
+    unsigned char* received_data = (unsigned char*)malloc(received_data_length);
+
+    (void)memcpy(received_data, test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    received_data[received_data_length - 5] = 0x81;
+    received_data[received_data_length - 4] = 0x01;
+    received_data[received_data_length - 3] = 'a';
+    received_data[received_data_length - 2] = 0x82;
+    received_data[received_data_length - 1] = 0x00;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_open_complete((void*)0x4242, WS_OPEN_OK));
+    STRICT_EXPECTED_CALL(test_on_ws_frame_received((void*)0x4243, WS_FRAME_TYPE_TEXT, IGNORED_PTR_ARG, 1))
+        .ValidateArgumentBuffer(3, "a", 1);
+    STRICT_EXPECTED_CALL(test_on_ws_frame_received((void*)0x4243, WS_FRAME_TYPE_BINARY, IGNORED_PTR_ARG, 0))
+        .IgnoreArgument_buffer();
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)received_data, received_data_length);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
 /* Tests_SRS_UWS_01_144: [ A client MUST close a connection if it detects a masked frame. ]*/
 /* Tests_SRS_UWS_01_145: [ In this case, it MAY use the status code 1002 (protocol error) as defined in Section 7.4.1. (These rules might be relaxed in a future specification.) ]*/
+/* Tests_SRS_UWS_01_160: [ Defines whether the "Payload data" is masked. ]*/
 TEST_FUNCTION(when_a_masked_frame_is_received_an_error_is_indicated_and_connection_is_closed)
 {
     // arrange
