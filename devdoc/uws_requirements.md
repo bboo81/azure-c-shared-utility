@@ -203,9 +203,10 @@ XX**SRS_UWS_01_380: [** If an WebSocket Upgrade request can be parsed from the a
 X**SRS_UWS_01_381: [** If the status is 101, uws shall be considered OPEN and this shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_OK`. **]**
 **SRS_UWS_01_382: [** If a negative status is decoded from the WebSocket upgrade request, an error shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_BAD_RESPONSE_STATUS`. **]**
 **SRS_UWS_01_383: [** If the WebSocket upgrade request cannot be decoded an error shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_BAD_UPGRADE_RESPONSE`. **]**
-**SRS_UWS_01_384: [** Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames by passing them to `uws_frame_decoder_decode`. **]**
-**SRS_UWS_01_385: [** If the state of the uws instance is OPEN, the received bytes shall be used for decoding WebSocket frames. **]**
-X**SRS_UWS_01_386: [** When a WebSocket data frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. **]**
+**SRS_UWS_01_384: [** Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames **]**
+XX**SRS_UWS_01_385: [** If the state of the uws instance is OPEN, the received bytes shall be used for decoding WebSocket frames. **]**
+**SRS_UWS_01_418: [** If allocating memory for the bytes accumulated for decoding WebSocket frames fails, an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_NOT_ENOUGH_MEMORY`. **]**
+XX**SRS_UWS_01_386: [** When a WebSocket data frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. **]**
 
 ### on_underlying_io_close_complete
 
@@ -658,7 +659,7 @@ X**SRS_UWS_01_386: [** When a WebSocket data frame is decoded succesfully it sha
 
       **SRS_UWS_01_153: [** *  %x1 denotes a text frame **]**
 
-      **SRS_UWS_01_154: [** *  %x2 denotes a binary frame **]**
+      XX**SRS_UWS_01_154: [** *  %x2 denotes a binary frame **]**
 
       **SRS_UWS_01_155: [** *  %x3-7 are reserved for further non-control frames **]**
 

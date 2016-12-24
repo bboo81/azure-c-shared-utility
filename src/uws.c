@@ -38,6 +38,10 @@ typedef struct WS_INSTANCE_PROTOCOL_TAG
     char* protocol;
 } WS_INSTANCE_PROTOCOL;
 
+#define OPCODE_CONTINUATION_FRAME   0x0
+#define OPCODE_TEXT_FRAME           0x1
+#define OPCODE_BINARY_FRAME         0x2
+
 typedef struct UWS_INSTANCE_TAG
 {
     SINGLYLINKEDLIST_HANDLE pending_sends;
@@ -475,6 +479,7 @@ static void on_underlying_io_bytes_received(void* context, const unsigned char* 
 
             case UWS_STATE_OPEN:
             {
+                /* Codes_SRS_UWS_01_385: [ If the state of the uws instance is OPEN, the received bytes shall be used for decoding WebSocket frames. ]*/
                 unsigned char* new_received_bytes = (unsigned char*)realloc(uws->received_bytes, uws->received_bytes_count + size);
                 if (new_received_bytes == NULL)
                 {
@@ -495,8 +500,25 @@ static void on_underlying_io_bytes_received(void* context, const unsigned char* 
 
                         if (uws->received_bytes_count >= needed_bytes)
                         {
-                            /* frame received */
-                            uws->on_ws_frame_received(uws->on_ws_frame_received_context, WS_FRAME_TYPE_BINARY, uws->received_bytes + needed_bytes - length, length);
+                            unsigned char opcode = uws->received_bytes[0] & 0xF;
+
+
+                            switch (opcode)
+                            {
+                            default:
+                                break;
+                            /* Codes_SRS_UWS_01_153: [ *  %x1 denotes a text frame ]*/
+                            case OPCODE_TEXT_FRAME:
+                                /* Codes_SRS_UWS_01_386: [ When a WebSocket data frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. ]*/
+                                uws->on_ws_frame_received(uws->on_ws_frame_received_context, WS_FRAME_TYPE_TEXT, uws->received_bytes + needed_bytes - length, length);
+                                break;
+                            /* Codes_SRS_UWS_01_154: [ *  %x2 denotes a binary frame ]*/
+                            case OPCODE_BINARY_FRAME:
+                                /* Codes_SRS_UWS_01_386: [ When a WebSocket data frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. ]*/
+                                uws->on_ws_frame_received(uws->on_ws_frame_received_context, WS_FRAME_TYPE_BINARY, uws->received_bytes + needed_bytes - length, length);
+                                break;
+                            }
+
                             consume_received_bytes(uws, needed_bytes);
                         }
                     }
