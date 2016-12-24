@@ -67,6 +67,27 @@ static void my_gballoc_free(void* ptr)
 
 #include "azure_c_shared_utility/uws_frame_encoder.h"
 
+extern BUFFER_HANDLE real_BUFFER_new(void);
+extern void real_BUFFER_delete(BUFFER_HANDLE handle);
+extern int real_BUFFER_enlarge(BUFFER_HANDLE handle, size_t enlargeSize);
+extern int real_BUFFER_size(BUFFER_HANDLE handle, size_t* size);
+extern int real_BUFFER_content(BUFFER_HANDLE handle, const unsigned char** content);
+
+int my_BUFFER_enlarge(BUFFER_HANDLE handle, size_t enlargeSize)
+{
+    return real_BUFFER_enlarge(handle, enlargeSize);
+}
+
+int my_BUFFER_size(BUFFER_HANDLE handle, size_t* size)
+{
+    return real_BUFFER_size(handle, size);
+}
+
+int my_BUFFER_content(BUFFER_HANDLE handle, const unsigned char** content)
+{
+    return real_BUFFER_content(handle, content);
+}
+
 static TEST_MUTEX_HANDLE g_testByTest;
 static TEST_MUTEX_HANDLE g_dllByDll;
 
@@ -125,7 +146,7 @@ TEST_FUNCTION_CLEANUP(method_cleanup)
 /* uws_frame_encoder_encode */
 
 /* Tests_SRS_UWS_FRAME_ENCODER_01_045: [ If the argument `encode_buffer` is NULL then `uws_frame_encoder_encode` shall fail and return a non-zero value. ]*/
-TEST_FUNCTION(uws_frame_encoder_create_with_NULL_buffer_fails)
+TEST_FUNCTION(uws_frame_encoder_encode_with_NULL_buffer_fails)
 {
 	// arrange
     int result;
@@ -137,6 +158,26 @@ TEST_FUNCTION(uws_frame_encoder_create_with_NULL_buffer_fails)
 	// assert
     ASSERT_ARE_NOT_EQUAL(int, 0, result);
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_001: [ `uws_frame_encoder_encode` shall encode the information given in `opcode`, `payload`, `length`, `is_masked`, `is_final` and `reserved` according to the RFC6455 into the `encode_buffer` argument.]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_044: [ On success `uws_frame_encoder_encode` shall return 0. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_046: [ The buffer `encode_buffer` shall be resized accordingly using `BUFFER_resize`. ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_zero_length_binary_frame)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, 0x02, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
 }
 
 END_TEST_SUITE(uws_frame_encoder_ut)

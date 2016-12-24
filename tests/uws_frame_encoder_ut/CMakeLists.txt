@@ -12,6 +12,7 @@ ${theseTestsName}.c
 
 set(${theseTestsName}_c_files
 ../../src/uws_frame_encoder.c
+real_buffer.c
 )
 
 set(${theseTestsName}_h_files
