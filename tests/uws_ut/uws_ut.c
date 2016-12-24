@@ -2146,7 +2146,7 @@ TEST_FUNCTION(when_a_1_byte_binary_frame_is_received_it_shall_be_indicated_to_th
     // arrange
     TLSIO_CONFIG tlsio_config;
     UWS_HANDLE uws;
-    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n\0";
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
     const unsigned char test_frame[] = { 0x81, 0x01, 0x42 };
     const unsigned char expected_payload[] = { 0x42 };
 
@@ -2156,9 +2156,10 @@ TEST_FUNCTION(when_a_1_byte_binary_frame_is_received_it_shall_be_indicated_to_th
     uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
     (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
     g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
-    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
     umock_c_reset_all_calls();
 
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
     STRICT_EXPECTED_CALL(test_on_ws_frame_received((void*)0x4243, WS_FRAME_TYPE_BINARY, IGNORED_PTR_ARG, 1))
         .ValidateArgumentBuffer(3, expected_payload, sizeof(expected_payload));
 

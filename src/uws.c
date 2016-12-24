@@ -25,6 +25,14 @@ typedef enum UWS_STATE_TAG
     UWS_STATE_ERROR
 } UWS_STATE;
 
+typedef enum UWS_FRAME_DECODER_STATE_TAG
+{
+    UWS_FRAME_DECODER_STATE_HEADER_AND_LENGTH,
+    UWS_FRAME_DECODER_STATE_EXTENDED_LENGTH_16,
+    UWS_FRAME_DECODER_STATE_EXTENDED_LENGTH_64,
+    UWS_FRAME_DECODER_STATE_PAYLOAD_BYTES
+} UWS_FRAME_DECODER_STATE;
+
 typedef struct WS_INSTANCE_PROTOCOL_TAG
 {
     char* protocol;
@@ -42,10 +50,13 @@ typedef struct UWS_INSTANCE_TAG
     UWS_STATE uws_state;
     ON_WS_OPEN_COMPLETE on_ws_open_complete;
     void* on_ws_open_complete_context;
+    ON_WS_FRAME_RECEIVED on_ws_frame_received;
+    void* on_ws_frame_received_context;
     ON_WS_CLOSE_COMPLETE on_ws_close_complete;
     void* on_ws_close_complete_context;
     unsigned char* received_bytes;
     size_t received_bytes_count;
+    UWS_FRAME_DECODER_STATE frame_decoder_state;
 } UWS_INSTANCE;
 
 UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl, const WS_PROTOCOL* protocols, size_t protocol_count)
@@ -196,6 +207,8 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resou
 
                                 result->on_ws_open_complete = NULL;
                                 result->on_ws_open_complete_context = NULL;
+                                result->on_ws_frame_received = NULL;
+                                result->on_ws_frame_received_context = NULL;
                                 result->on_ws_close_complete = NULL;
                                 result->on_ws_close_complete_context = NULL;
                                 result->received_bytes = NULL;
@@ -394,6 +407,16 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
     }
 }
 
+static void consume_received_bytes(UWS_INSTANCE* uws, size_t consumed_bytes)
+{
+    if (consumed_bytes < uws->received_bytes_count)
+    {
+        (void)memmove(uws->received_bytes, uws->received_bytes + consumed_bytes, uws->received_bytes_count - consumed_bytes);
+    }
+
+    uws->received_bytes_count -= consumed_bytes;
+}
+
 static void on_underlying_io_bytes_received(void* context, const unsigned char* buffer, size_t size)
 {
     /* Codes_SRS_UWS_01_415: [ If called with a NULL `context` argument, `on_underlying_io_bytes_received` shall do nothing. ]*/
@@ -411,46 +434,76 @@ static void on_underlying_io_bytes_received(void* context, const unsigned char* 
         {
             switch (uws->uws_state)
             {
-                default:
-                case UWS_STATE_CLOSED:
-                    break;
+            default:
+            case UWS_STATE_CLOSED:
+                break;
 
-                case UWS_STATE_OPENING_UNDERLYING_IO:
-                    /* Codes_SRS_UWS_01_417: [ When `on_underlying_io_bytes_received` is called while OPENING but before the `on_underlying_io_open_complete` has been called, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_BYTES_RECEIVED_BEFORE_UNDERLYING_OPEN`. ]*/
-                    indicate_ws_open_complete_error_and_close(uws, WS_OPEN_ERROR_BYTES_RECEIVED_BEFORE_UNDERLYING_OPEN);
-                    break;
+            case UWS_STATE_OPENING_UNDERLYING_IO:
+                /* Codes_SRS_UWS_01_417: [ When `on_underlying_io_bytes_received` is called while OPENING but before the `on_underlying_io_open_complete` has been called, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_BYTES_RECEIVED_BEFORE_UNDERLYING_OPEN`. ]*/
+                indicate_ws_open_complete_error_and_close(uws, WS_OPEN_ERROR_BYTES_RECEIVED_BEFORE_UNDERLYING_OPEN);
+                break;
 
-                case UWS_STATE_WAITING_FOR_UPGRADE_RESPONSE:
+            case UWS_STATE_WAITING_FOR_UPGRADE_RESPONSE:
+            {
+                /* Codes_SRS_UWS_01_378: [ When `on_underlying_io_bytes_received` is called while the uws is OPENING, the received bytes shall be accumulated in order to attempt parsing the WebSocket Upgrade response. ]*/
+                unsigned char* new_received_bytes = (unsigned char*)realloc(uws->received_bytes, uws->received_bytes_count + size);
+                if (new_received_bytes == NULL)
                 {
-                    /* Codes_SRS_UWS_01_378: [ When `on_underlying_io_bytes_received` is called while the uws is OPENING, the received bytes shall be accumulated in order to attempt parsing the WebSocket Upgrade response. ]*/
-                    unsigned char* new_received_bytes = (unsigned char*)realloc(uws->received_bytes, uws->received_bytes_count + size);
-                    if (new_received_bytes == NULL)
-                    {
-                        /* Codes_SRS_UWS_01_379: [ If allocating memory for accumulating the bytes fails, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_NOT_ENOUGH_MEMORY`. ]*/
-                        indicate_ws_open_complete_error_and_close(uws, WS_OPEN_ERROR_NOT_ENOUGH_MEMORY);
-                    }
-                    else
-                    {
-                        uws->received_bytes = new_received_bytes;
-                        (void)memcpy(uws->received_bytes + uws->received_bytes_count, buffer, size);
-                        uws->received_bytes_count += size;
+                    /* Codes_SRS_UWS_01_379: [ If allocating memory for accumulating the bytes fails, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_NOT_ENOUGH_MEMORY`. ]*/
+                    indicate_ws_open_complete_error_and_close(uws, WS_OPEN_ERROR_NOT_ENOUGH_MEMORY);
+                }
+                else
+                {
+                    char* request_end_ptr;
 
-                        /* Codes_SRS_UWS_01_380: [ If an WebSocket Upgrade request can be parsed from the accumulated bytes, the status shall be read from the WebSocket upgrade response. ]*/
-                        /* Codes_SRS_UWS_01_381: [ If the status is 101, uws shall be considered OPEN and this shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_OK`. ]*/
-                        if ((uws->received_bytes_count >= 4) &&
-                            (uws->received_bytes[uws->received_bytes_count - 4] == '\r') &&
-                            (uws->received_bytes[uws->received_bytes_count - 3] == '\n') &&
-                            (uws->received_bytes[uws->received_bytes_count - 2] == '\r') &&
-                            (uws->received_bytes[uws->received_bytes_count - 1] == '\n'))
+                    uws->received_bytes = new_received_bytes;
+                    (void)memcpy(uws->received_bytes + uws->received_bytes_count, buffer, size);
+                    uws->received_bytes_count += size;
+
+                    /* Codes_SRS_UWS_01_380: [ If an WebSocket Upgrade request can be parsed from the accumulated bytes, the status shall be read from the WebSocket upgrade response. ]*/
+                    /* Codes_SRS_UWS_01_381: [ If the status is 101, uws shall be considered OPEN and this shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_OK`. ]*/
+                    if ((uws->received_bytes_count >= 4) &&
+                        ((request_end_ptr = strstr((const char*)uws->received_bytes, "\r\n\r\n")) != NULL))
+                    {
+                        consume_received_bytes(uws, request_end_ptr - (char*)uws->received_bytes + 4);
+                        uws->uws_state = UWS_STATE_OPEN;
+                        uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_OK);
+                    }
+                }
+                break;
+            }
+
+            case UWS_STATE_OPEN:
+            {
+                unsigned char* new_received_bytes = (unsigned char*)realloc(uws->received_bytes, uws->received_bytes_count + size);
+                if (new_received_bytes == NULL)
+                {
+                }
+                else
+                {
+                    size_t needed_bytes = 2;
+                    size_t length;
+
+                    uws->received_bytes = new_received_bytes;
+                    (void)memcpy(uws->received_bytes + uws->received_bytes_count, buffer, size);
+                    uws->received_bytes_count += size;
+
+                    if (uws->received_bytes_count >= needed_bytes)
+                    {
+                        length = uws->received_bytes[1];
+                        needed_bytes += length;
+
+                        if (uws->received_bytes_count >= needed_bytes)
                         {
-                            uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_OK);
+                            /* frame received */
+                            uws->on_ws_frame_received(uws->on_ws_frame_received_context, WS_FRAME_TYPE_BINARY, uws->received_bytes + needed_bytes - length, length);
+                            consume_received_bytes(uws, needed_bytes);
                         }
                     }
-                    break;
                 }
 
-                case UWS_STATE_OPEN:
-                    break;
+                break;
+            }
             }
         }
     }
@@ -470,7 +523,6 @@ int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_w
 {
     int result;
 
-    (void)on_ws_frame_received_context;
     (void)on_ws_error_context;
 
     /* Codes_SRS_UWS_01_393: [ The context arguments for the callbacks shall be allowed to be NULL. ]*/
@@ -508,6 +560,8 @@ int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_w
                 uws->uws_state = UWS_STATE_OPENING_UNDERLYING_IO;
                 uws->on_ws_open_complete = on_ws_open_complete;
                 uws->on_ws_open_complete_context = on_ws_open_complete_context;
+                uws->on_ws_frame_received = on_ws_frame_received;
+                uws->on_ws_frame_received_context = on_ws_frame_received_context;
 
                 /* Codes_SRS_UWS_01_026: [ On success, `uws_open` shall return 0. ]*/
                 result = 0;
