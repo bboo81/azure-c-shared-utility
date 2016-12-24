@@ -6,8 +6,7 @@
 
 #define ENABLE_MOCKS
 
-#include "azure_c_shared_utility/uws_frame.h"
-#include "azure_c_shared_utility/uws_frame_decoder.h"
+#include "azure_c_shared_utility/uws_frame_encoder.h"
 
 static size_t currentmalloc_call;
 static size_t whenShallmalloc_fail;
@@ -101,7 +100,7 @@ static int my_singlylinkedlist_remove(SINGLYLINKEDLIST_HANDLE list, LIST_ITEM_HA
 
 #undef ENABLE_MOCKS
 
-#include "azure_c_shared_utility/uws_frame_decoder.h"
+#include "azure_c_shared_utility/uws_frame_encoder.h"
 
 static TEST_MUTEX_HANDLE g_testByTest;
 static TEST_MUTEX_HANDLE g_dllByDll;

@@ -4,14 +4,14 @@
 cmake_minimum_required(VERSION 2.8.11)
 
 compileAsC99()
-set(theseTestsName uws_frame_decoder_ut)
+set(theseTestsName uws_frame_encoder_ut)
 
 set(${theseTestsName}_test_files
 ${theseTestsName}.c
 )
 
 set(${theseTestsName}_c_files
-../../src/uws_frame_decoder.c
+../../src/uws_frame_encoder.c
 )
 
 set(${theseTestsName}_h_files

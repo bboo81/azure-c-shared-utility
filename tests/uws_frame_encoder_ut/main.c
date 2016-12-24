@@ -6,6 +6,6 @@
 int main(void)
 {
     size_t failedTestCount = 0;
-    RUN_TEST_SUITE(uws_frame_decoder_ut, failedTestCount);
+    RUN_TEST_SUITE(uws_frame_encoder_ut, failedTestCount);
     return failedTestCount;
 }
