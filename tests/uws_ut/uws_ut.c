@@ -172,6 +172,8 @@ static const WS_PROTOCOL protocols[] = { { "test_protocol" } };
 
 TEST_DEFINE_ENUM_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
 IMPLEMENT_UMOCK_C_ENUM_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
+TEST_DEFINE_ENUM_TYPE(WS_ERROR, WS_ERROR_VALUES);
+IMPLEMENT_UMOCK_C_ENUM_TYPE(WS_ERROR, WS_ERROR_VALUES);
 
 static char* umocktypes_stringify_const_SOCKETIO_CONFIG_ptr(const SOCKETIO_CONFIG** value)
 {
@@ -274,7 +276,7 @@ MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_open_complete, void*, context, WS_OPE
 MOCK_FUNCTION_END()
 MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_frame_received, void*, context, unsigned char, frame_type, const unsigned char*, buffer, size_t, size);
 MOCK_FUNCTION_END()
-MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_error, void*, context);
+MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_error, void*, context, WS_ERROR, error_code);
 MOCK_FUNCTION_END()
 MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_close_complete, void*, context);
 MOCK_FUNCTION_END()
@@ -360,6 +362,7 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT);
     REGISTER_TYPE(IO_SEND_RESULT, IO_SEND_RESULT);
     REGISTER_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT);
+    REGISTER_TYPE(WS_ERROR, WS_ERROR);
     REGISTER_TYPE(const SOCKETIO_CONFIG*, const_SOCKETIO_CONFIG_ptr);
 
     REGISTER_UMOCK_ALIAS_TYPE(SINGLYLINKEDLIST_HANDLE, void*);
@@ -2143,6 +2146,12 @@ TEST_FUNCTION(when_1_extra_byte_is_received_the_open_complete_is_properly_indica
 /* Tests_SRS_UWS_01_386: [ When a WebSocket data frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. ]*/
 /* Tests_SRS_UWS_01_385: [ If the state of the uws instance is OPEN, the received bytes shall be used for decoding WebSocket frames. ]*/
 /* Tests_SRS_UWS_01_154: [ *  %x2 denotes a binary frame ]*/
+/* Tests_SRS_UWS_01_163: [ The length of the "Payload data", in bytes: ]*/
+/* Tests_SRS_UWS_01_164: [ if 0-125, that is the payload length. ]*/
+/* Tests_SRS_UWS_01_169: [ The payload length is the length of the "Extension data" + the length of the "Application data". ]*/
+/* Tests_SRS_UWS_01_173: [ The "Payload data" is defined as "Extension data" concatenated with "Application data". ]*/
+/* Tests_SRS_UWS_01_147: [ Indicates that this is the final fragment in a message. ]*/
+/* Tests_SRS_UWS_01_148: [ The first fragment MAY also be the final fragment. ]*/
 TEST_FUNCTION(when_a_1_byte_binary_frame_is_received_it_shall_be_indicated_to_the_user)
 {
     // arrange
@@ -2200,6 +2209,667 @@ TEST_FUNCTION(when_a_1_byte_text_frame_is_received_it_shall_be_indicated_to_the_
 
     // act
     g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_163: [ The length of the "Payload data", in bytes: ]*/
+/* Tests_SRS_UWS_01_164: [ if 0-125, that is the payload length. ]*/
+TEST_FUNCTION(when_a_0_bytes_binary_frame_is_received_it_shall_be_indicated_to_the_user)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    const unsigned char test_frame[] = { 0x82, 0x00 };
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_frame_received((void*)0x4243, WS_FRAME_TYPE_BINARY, IGNORED_PTR_ARG, 0))
+        .IgnoreArgument_buffer();
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_163: [ The length of the "Payload data", in bytes: ]*/
+/* Tests_SRS_UWS_01_164: [ if 0-125, that is the payload length. ]*/
+TEST_FUNCTION(when_a_125_bytes_binary_frame_is_received_it_shall_be_indicated_to_the_user)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_frame[125 + 2] = { 0x82, 0x7D };
+    size_t i;
+
+    for (i = 0; i < 125; i++)
+    {
+        test_frame[2 + i] = (unsigned char)i;
+    }
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_frame_received((void*)0x4243, WS_FRAME_TYPE_BINARY, IGNORED_PTR_ARG, 125))
+        .ValidateArgumentBuffer(3, &test_frame[2], 125);
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_165: [ If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length. ]*/
+/* Tests_SRS_UWS_01_167: [ Multibyte length quantities are expressed in network byte order. ]*/
+TEST_FUNCTION(when_a_126_bytes_binary_frame_is_received_it_shall_be_indicated_to_the_user)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_frame[126 + 4] = { 0x82, 0x7E, 0x00, 0x7E };
+    size_t i;
+
+    for (i = 0; i < 126; i++)
+    {
+        test_frame[4 + i] = (unsigned char)i;
+    }
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_frame_received((void*)0x4243, WS_FRAME_TYPE_BINARY, IGNORED_PTR_ARG, 126))
+        .ValidateArgumentBuffer(3, &test_frame[4], 126);
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_165: [ If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length. ]*/
+/* Tests_SRS_UWS_01_167: [ Multibyte length quantities are expressed in network byte order. ]*/
+TEST_FUNCTION(when_a_127_bytes_binary_frame_is_received_it_shall_be_indicated_to_the_user)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_frame[127 + 4] = { 0x82, 0x7E, 0x00, 0x7F };
+    size_t i;
+
+    for (i = 0; i < 127; i++)
+    {
+        test_frame[4 + i] = (unsigned char)i;
+    }
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_frame_received((void*)0x4243, WS_FRAME_TYPE_BINARY, IGNORED_PTR_ARG, 127))
+        .ValidateArgumentBuffer(3, &test_frame[4], 127);
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_165: [ If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length. ]*/
+/* Tests_SRS_UWS_01_167: [ Multibyte length quantities are expressed in network byte order. ]*/
+TEST_FUNCTION(when_a_65535_bytes_binary_frame_is_received_it_shall_be_indicated_to_the_user)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char* test_frame = (unsigned char*)malloc(65535 + 4);
+    test_frame[0] = 0x82;
+    test_frame[1] = 0x7E;
+    test_frame[2] = 0xFF;
+    test_frame[3] = 0xFF;
+    size_t i;
+
+    for (i = 0; i < 65535; i++)
+    {
+        test_frame[4 + i] = (unsigned char)i;
+    }
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_frame_received((void*)0x4243, WS_FRAME_TYPE_BINARY, IGNORED_PTR_ARG, 65535))
+        .ValidateArgumentBuffer(3, &test_frame[4], 65535);
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, 65535 + 4);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    free(test_frame);
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_166: [ If 127, the following 8 bytes interpreted as a 64-bit unsigned integer (the most significant bit MUST be 0) are the payload length. ]*/
+/* Tests_SRS_UWS_01_167: [ Multibyte length quantities are expressed in network byte order. ]*/
+TEST_FUNCTION(when_a_65536_bytes_binary_frame_is_received_it_shall_be_indicated_to_the_user)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char* test_frame = (unsigned char*)malloc(65536 + 10);
+    test_frame[0] = 0x82;
+    test_frame[1] = 0x7F;
+    test_frame[2] = 0x00;
+    test_frame[3] = 0x00;
+    test_frame[4] = 0x00;
+    test_frame[5] = 0x00;
+    test_frame[6] = 0x00;
+    test_frame[7] = 0x01;
+    test_frame[8] = 0x00;
+    test_frame[9] = 0x00;
+    size_t i;
+
+    for (i = 0; i < 65536; i++)
+    {
+        test_frame[10 + i] = (unsigned char)i;
+    }
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_frame_received((void*)0x4243, WS_FRAME_TYPE_BINARY, IGNORED_PTR_ARG, 65536))
+        .ValidateArgumentBuffer(3, &test_frame[10], 65536);
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, 65536 + 10);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    free(test_frame);
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_166: [ If 127, the following 8 bytes interpreted as a 64-bit unsigned integer (the most significant bit MUST be 0) are the payload length. ]*/
+/* Tests_SRS_UWS_01_167: [ Multibyte length quantities are expressed in network byte order. ]*/
+TEST_FUNCTION(when_a_65537_bytes_binary_frame_is_received_it_shall_be_indicated_to_the_user)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char* test_frame = (unsigned char*)malloc(65537 + 10);
+    test_frame[0] = 0x82;
+    test_frame[1] = 0x7F;
+    test_frame[2] = 0x00;
+    test_frame[3] = 0x00;
+    test_frame[4] = 0x00;
+    test_frame[5] = 0x00;
+    test_frame[6] = 0x00;
+    test_frame[7] = 0x01;
+    test_frame[8] = 0x00;
+    test_frame[9] = 0x01;
+    size_t i;
+
+    for (i = 0; i < 65537; i++)
+    {
+        test_frame[10 + i] = (unsigned char)i;
+    }
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_frame_received((void*)0x4243, WS_FRAME_TYPE_BINARY, IGNORED_PTR_ARG, 65537))
+        .ValidateArgumentBuffer(3, &test_frame[10], 65537);
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, 65537 + 10);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    free(test_frame);
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_168: [ Note that in all cases, the minimal number of bytes MUST be used to encode the length, for example, the length of a 124-byte-long string can't be encoded as the sequence 126, 0, 124. ]*/
+/* Tests_SRS_UWS_01_419: [ If there is an error decoding the WebSocket frame, an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_BAD_FRAME_RECEIVED`. ]*/
+TEST_FUNCTION(when_a_0_byte_binary_frame_is_received_with_16_bit_length_an_error_is_indicated)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_frame[] = { 0x82, 0x7E, 0x00, 0x00 };
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_BAD_FRAME_RECEIVED));
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_168: [ Note that in all cases, the minimal number of bytes MUST be used to encode the length, for example, the length of a 124-byte-long string can't be encoded as the sequence 126, 0, 124. ]*/
+/* Tests_SRS_UWS_01_419: [ If there is an error decoding the WebSocket frame, an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_BAD_FRAME_RECEIVED`. ]*/
+TEST_FUNCTION(when_a_125_byte_binary_frame_is_received_with_16_bit_length_an_error_is_indicated)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_frame[125 + 4] = { 0x82, 0x7E, 0x00, 0x7D };
+    size_t i;
+
+    for (i = 0; i < 125; i++)
+    {
+        test_frame[4 + i] = (unsigned char)i;
+    }
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_BAD_FRAME_RECEIVED));
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_168: [ Note that in all cases, the minimal number of bytes MUST be used to encode the length, for example, the length of a 124-byte-long string can't be encoded as the sequence 126, 0, 124. ]*/
+/* Tests_SRS_UWS_01_419: [ If there is an error decoding the WebSocket frame, an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_BAD_FRAME_RECEIVED`. ]*/
+TEST_FUNCTION(when_a_0_byte_binary_frame_is_received_with_64_bit_length_an_error_is_indicated)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_frame[] = { 0x82, 0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_BAD_FRAME_RECEIVED));
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_168: [ Note that in all cases, the minimal number of bytes MUST be used to encode the length, for example, the length of a 124-byte-long string can't be encoded as the sequence 126, 0, 124. ]*/
+/* Tests_SRS_UWS_01_419: [ If there is an error decoding the WebSocket frame, an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_BAD_FRAME_RECEIVED`. ]*/
+TEST_FUNCTION(when_a_65535_byte_binary_frame_is_received_with_64_bit_length_an_error_is_indicated)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char* test_frame = (unsigned char*)malloc(65535 + 10);
+    test_frame[0] = 0x82;
+    test_frame[1] = 0x7F;
+    test_frame[2] = 0x00;
+    test_frame[3] = 0x00;
+    test_frame[4] = 0x00;
+    test_frame[5] = 0x00;
+    test_frame[6] = 0x00;
+    test_frame[7] = 0x00;
+    test_frame[8] = 0xFF;
+    test_frame[9] = 0xFF;
+    size_t i;
+
+    for (i = 0; i < 65535; i++)
+    {
+        test_frame[10 + i] = (unsigned char)i;
+    }
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_BAD_FRAME_RECEIVED));
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, 65535 + 10);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_168: [ Note that in all cases, the minimal number of bytes MUST be used to encode the length, for example, the length of a 124-byte-long string can't be encoded as the sequence 126, 0, 124. ]*/
+/* Tests_SRS_UWS_01_419: [ If there is an error decoding the WebSocket frame, an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_BAD_FRAME_RECEIVED`. ]*/
+TEST_FUNCTION(check_for_16_bit_length_too_low_is_done_as_soon_as_length_is_received)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_frame[] = { 0x82, 0x7E, 0x00, 0x7D };
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_BAD_FRAME_RECEIVED));
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_168: [ Note that in all cases, the minimal number of bytes MUST be used to encode the length, for example, the length of a 124-byte-long string can't be encoded as the sequence 126, 0, 124. ]*/
+/* Tests_SRS_UWS_01_419: [ If there is an error decoding the WebSocket frame, an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_BAD_FRAME_RECEIVED`. ]*/
+TEST_FUNCTION(check_for_64_bit_length_too_low_is_done_as_soon_as_length_is_received)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_frame[] = { 0x82, 0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF };
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_BAD_FRAME_RECEIVED));
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_166: [ If 127, the following 8 bytes interpreted as a 64-bit unsigned integer (the most significant bit MUST be 0) are the payload length. ]*/
+/* Tests_SRS_UWS_01_419: [ If there is an error decoding the WebSocket frame, an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_BAD_FRAME_RECEIVED`. ]*/
+TEST_FUNCTION(when_the_highest_bit_is_set_in_a_64_bit_length_frame_an_error_is_indicated)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char* test_frame = (unsigned char*)malloc(65536 + 10);
+    test_frame[0] = 0x82;
+    test_frame[1] = 0x7F;
+    test_frame[2] = 0x80;
+    test_frame[3] = 0x00;
+    test_frame[4] = 0x00;
+    test_frame[5] = 0x00;
+    test_frame[6] = 0x00;
+    test_frame[7] = 0x01;
+    test_frame[8] = 0x00;
+    test_frame[9] = 0x00;
+    size_t i;
+
+    for (i = 0; i < 65536; i++)
+    {
+        test_frame[10 + i] = (unsigned char)i;
+    }
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_BAD_FRAME_RECEIVED));
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, 65536 + 10);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_418: [ If allocating memory for the bytes accumulated for decoding WebSocket frames fails, an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_NOT_ENOUGH_MEMORY`. ]*/
+TEST_FUNCTION(when_allocating_memory_for_the_received_frame_bytes_fails_an_error_is_indicated)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_frame[] = { 0x82, 0x00 };
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG))
+        .SetReturn(NULL);
+    STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_NOT_ENOUGH_MEMORY));
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_384: [ Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames ]*/
+TEST_FUNCTION(when_1_byte_is_received_together_with_the_upgrade_request_and_one_byte_with_a_separate_call_decoding_frame_succeeds)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char* upgrade_response_frame = (unsigned char*)malloc(sizeof(test_upgrade_response));
+    unsigned char test_frame[] = { 0x00 };
+
+    (void)memcpy(upgrade_response_frame, test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    upgrade_response_frame[sizeof(test_upgrade_response) - 1] = 0x82;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)upgrade_response_frame, sizeof(test_upgrade_response));
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_frame_received((void*)0x4243, WS_FRAME_TYPE_BINARY, IGNORED_PTR_ARG, 0))
+        .IgnoreArgument_buffer();
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_384: [ Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames ]*/
+TEST_FUNCTION(when_a_complete_frame_is_received_together_with_the_upgrade_request_the_frame_is_indicated_as_received)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    size_t received_data_length = sizeof(test_upgrade_response) + 1;
+    unsigned char* received_data = (unsigned char*)malloc(received_data_length);
+
+    (void)memcpy(received_data, test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    received_data[received_data_length - 2] = 0x82;
+    received_data[received_data_length - 1] = 0x00;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_open_complete((void*)0x4242, WS_OPEN_OK));
+    STRICT_EXPECTED_CALL(test_on_ws_frame_received((void*)0x4243, WS_FRAME_TYPE_BINARY, IGNORED_PTR_ARG, 0))
+        .IgnoreArgument_buffer();
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)received_data, received_data_length);
 
     // assert
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());

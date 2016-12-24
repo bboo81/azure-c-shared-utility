@@ -205,8 +205,9 @@ X**SRS_UWS_01_381: [** If the status is 101, uws shall be considered OPEN and th
 **SRS_UWS_01_383: [** If the WebSocket upgrade request cannot be decoded an error shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_BAD_UPGRADE_RESPONSE`. **]**
 **SRS_UWS_01_384: [** Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames **]**
 XX**SRS_UWS_01_385: [** If the state of the uws instance is OPEN, the received bytes shall be used for decoding WebSocket frames. **]**
-**SRS_UWS_01_418: [** If allocating memory for the bytes accumulated for decoding WebSocket frames fails, an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_NOT_ENOUGH_MEMORY`. **]**
+XX**SRS_UWS_01_418: [** If allocating memory for the bytes accumulated for decoding WebSocket frames fails, an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_NOT_ENOUGH_MEMORY`. **]**
 XX**SRS_UWS_01_386: [** When a WebSocket data frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. **]**
+XX**SRS_UWS_01_419: [** If there is an error decoding the WebSocket frame, an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_BAD_FRAME_RECEIVED`. **]**
 
 ### on_underlying_io_close_complete
 
@@ -641,8 +642,8 @@ XX**SRS_UWS_01_386: [** When a WebSocket data frame is decoded succesfully it sh
 
    FIN:  1 bit
 
-      **SRS_UWS_01_147: [** Indicates that this is the final fragment in a message. **]**
-      **SRS_UWS_01_148: [** The first fragment MAY also be the final fragment. **]**
+      X**SRS_UWS_01_147: [** Indicates that this is the final fragment in a message. **]**
+      X**SRS_UWS_01_148: [** The first fragment MAY also be the final fragment. **]**
 
    RSV1, RSV2, RSV3:  1 bit each
 
@@ -657,7 +658,7 @@ XX**SRS_UWS_01_386: [** When a WebSocket data frame is decoded succesfully it sh
 
       **SRS_UWS_01_152: [** *  %x0 denotes a continuation frame **]**
 
-      **SRS_UWS_01_153: [** *  %x1 denotes a text frame **]**
+      XX**SRS_UWS_01_153: [** *  %x1 denotes a text frame **]**
 
       XX**SRS_UWS_01_154: [** *  %x2 denotes a binary frame **]**
 
@@ -679,12 +680,12 @@ XX**SRS_UWS_01_386: [** When a WebSocket data frame is decoded succesfully it sh
 
    Payload length:  7 bits, 7+16 bits, or 7+64 bits
 
-      **SRS_UWS_01_163: [** The length of the "Payload data", in bytes: **]** **SRS_UWS_01_164: [** if 0-125, that is the payload length. **]**
-      **SRS_UWS_01_165: [** If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length. **]**
-      **SRS_UWS_01_166: [** If 127, the following 8 bytes interpreted as a 64-bit unsigned integer (the most significant bit MUST be 0) are the payload length. **]**
-      **SRS_UWS_01_167: [** Multibyte length quantities are expressed in network byte order. **]**
-      **SRS_UWS_01_168: [** Note that in all cases, the minimal number of bytes MUST be used to encode the length, for example, the length of a 124-byte-long string can't be encoded as the sequence 126, 0, 124. **]**
-      **SRS_UWS_01_169: [** The payload length is the length of the "Extension data" + the length of the "Application data". **]**
+      XX**SRS_UWS_01_163: [** The length of the "Payload data", in bytes: **]** XX**SRS_UWS_01_164: [** if 0-125, that is the payload length. **]**
+      XX**SRS_UWS_01_165: [** If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length. **]**
+      XX**SRS_UWS_01_166: [** If 127, the following 8 bytes interpreted as a 64-bit unsigned integer (the most significant bit MUST be 0) are the payload length. **]**
+      XX**SRS_UWS_01_167: [** Multibyte length quantities are expressed in network byte order. **]**
+      XX**SRS_UWS_01_168: [** Note that in all cases, the minimal number of bytes MUST be used to encode the length, for example, the length of a 124-byte-long string can't be encoded as the sequence 126, 0, 124. **]**
+      XX**SRS_UWS_01_169: [** The payload length is the length of the "Extension data" + the length of the "Application data". **]**
       **SRS_UWS_01_170: [** The length of the "Extension data" may be zero, in which case the payload length is the length of the "Application data". **]**
 
    Masking-key:  0 or 4 bytes
@@ -695,7 +696,7 @@ XX**SRS_UWS_01_386: [** When a WebSocket data frame is decoded succesfully it sh
 
    Payload data:  (x+y) bytes
 
-      **SRS_UWS_01_173: [** The "Payload data" is defined as "Extension data" concatenated with "Application data". **]**
+      XX**SRS_UWS_01_173: [** The "Payload data" is defined as "Extension data" concatenated with "Application data". **]**
 
    Extension data:  x bytes
 
