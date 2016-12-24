@@ -203,7 +203,7 @@ XX**SRS_UWS_01_380: [** If an WebSocket Upgrade request can be parsed from the a
 X**SRS_UWS_01_381: [** If the status is 101, uws shall be considered OPEN and this shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_OK`. **]**
 **SRS_UWS_01_382: [** If a negative status is decoded from the WebSocket upgrade request, an error shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_BAD_RESPONSE_STATUS`. **]**
 **SRS_UWS_01_383: [** If the WebSocket upgrade request cannot be decoded an error shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_BAD_UPGRADE_RESPONSE`. **]**
-**SRS_UWS_01_384: [** Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames **]**
+XX**SRS_UWS_01_384: [** Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames **]**
 XX**SRS_UWS_01_385: [** If the state of the uws instance is OPEN, the received bytes shall be used for decoding WebSocket frames. **]**
 XX**SRS_UWS_01_418: [** If allocating memory for the bytes accumulated for decoding WebSocket frames fails, an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_NOT_ENOUGH_MEMORY`. **]**
 XX**SRS_UWS_01_386: [** When a WebSocket data frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. **]**
@@ -604,8 +604,8 @@ XX**SRS_UWS_01_419: [** If there is an error decoding the WebSocket frame, an er
    The server MUST close the connection upon receiving a frame that is not masked.
    **SRS_UWS_01_142: [** In this case, a server MAY send a Close frame with a status code of 1002 (protocol error) as defined in Section 7.4.1. **]**
    **SRS_UWS_01_143: [** A server MUST NOT mask any frames that it sends to the client. **]**
-   **SRS_UWS_01_144: [** A client MUST close a connection if it detects a masked frame. **]**
-   **SRS_UWS_01_145: [** In this case, it MAY use the status code 1002 (protocol error) as defined in Section 7.4.1. (These rules might be relaxed in a future specification.) **]**
+   XX**SRS_UWS_01_144: [** A client MUST close a connection if it detects a masked frame. **]**
+   XX**SRS_UWS_01_145: [** In this case, it MAY use the status code 1002 (protocol error) as defined in Section 7.4.1. (These rules might be relaxed in a future specification.) **]**
 
    The base framing protocol defines a frame type with an opcode, a payload length, and designated locations for "Extension data" and "Application data", which together define the "Payload data".
    Certain bits and opcodes are reserved for future expansion of the protocol.

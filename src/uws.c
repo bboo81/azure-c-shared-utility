@@ -331,6 +331,25 @@ static void indicate_ws_error(UWS_INSTANCE* uws, WS_ERROR error_code)
     uws->on_ws_error(uws->on_ws_error_context, error_code);
 }
 
+static void indicate_ws_error_and_close(UWS_INSTANCE* uws, WS_ERROR error_code, unsigned int close_error_code)
+{
+    unsigned char close_frame[4];
+    close_frame[0] = 0x88;
+    close_frame[1] = 0x02;
+    close_frame[2] = (unsigned char)(close_error_code >> 8);
+    close_frame[3] = (unsigned char)(close_error_code & 0xFF);
+
+    uws->uws_state = UWS_STATE_ERROR;
+    if (xio_send(uws->underlying_io, close_frame, sizeof(close_frame), NULL, NULL) != 0)
+    {
+
+    }
+    else
+    {
+        uws->on_ws_error(uws->on_ws_error_context, error_code);
+    }
+}
+
 static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_result)
 {
     UWS_HANDLE uws = context;
@@ -533,6 +552,7 @@ static void on_underlying_io_bytes_received(void* context, const unsigned char* 
                     if ((uws->received_bytes_count >= 4) &&
                         ((request_end_ptr = strstr((const char*)uws->received_bytes, "\r\n\r\n")) != NULL))
                     {
+                        /* Codes_SRS_UWS_01_384: [ Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames ]*/
                         consume_received_bytes(uws, request_end_ptr - (char*)uws->received_bytes + 4);
                         uws->uws_state = UWS_STATE_OPEN;
                         uws->on_ws_open_complete(uws->on_ws_open_complete_context, WS_OPEN_OK);
@@ -551,6 +571,13 @@ static void on_underlying_io_bytes_received(void* context, const unsigned char* 
                     if (uws->received_bytes_count >= needed_bytes)
                     {
                         unsigned char has_error = 0;
+
+                        if ((uws->received_bytes[1] & 0x80) != 0)
+                        {
+                            /* Codes_SRS_UWS_01_144: [ A client MUST close a connection if it detects a masked frame. ]*/
+                            /* Codes_SRS_UWS_01_145: [ In this case, it MAY use the status code 1002 (protocol error) as defined in Section 7.4.1. (These rules might be relaxed in a future specification.) ]*/
+                            indicate_ws_error_and_close(uws, WS_ERROR_BAD_FRAME_RECEIVED, 1002);
+                        }
 
                         /* Codes_SRS_UWS_01_163: [ The length of the "Payload data", in bytes: ]*/
                         /* Codes_SRS_UWS_01_164: [ if 0-125, that is the payload length. ]*/

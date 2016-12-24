@@ -2878,4 +2878,39 @@ TEST_FUNCTION(when_a_complete_frame_is_received_together_with_the_upgrade_reques
     uws_destroy(uws);
 }
 
+/* Tests_SRS_UWS_01_144: [ A client MUST close a connection if it detects a masked frame. ]*/
+/* Tests_SRS_UWS_01_145: [ In this case, it MAY use the status code 1002 (protocol error) as defined in Section 7.4.1. (These rules might be relaxed in a future specification.) ]*/
+TEST_FUNCTION(when_a_masked_frame_is_received_an_error_is_indicated_and_connection_is_closed)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_frame[] = { 0x82, 0x80 };
+    unsigned char close_frame[] = { 0x88, 0x02, 0x03, 0xEA };
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(xio_send(TEST_IO_HANDLE, close_frame, sizeof(close_frame), NULL, NULL))
+        .ValidateArgumentBuffer(2, close_frame, sizeof(close_frame));
+    STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_BAD_FRAME_RECEIVED));
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
 END_TEST_SUITE(uws_ut)
