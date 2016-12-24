@@ -11,7 +11,9 @@ extern "C" {
 #include <stdbool.h>
 #endif
 
-extern int uws_frame_encoder_encode(BUFFER_HANDLE buffer, unsigned char opcode, const void* payload, size_t length, bool masked, bool final, unsigned char reserved);
+#include "azure_c_shared_utility/buffer_.h"
+
+extern int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, const void* payload, size_t length, bool is_masked, bool is_final, unsigned char reserved);
 
 #ifdef __cplusplus
 }

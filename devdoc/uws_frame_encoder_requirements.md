@@ -11,19 +11,19 @@ RFC6455 - The WebSocket Protocol.
 ## Exposed API
 
 ```c
-extern int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, const void* payload, size_t length, bool masked, bool final, unsigned char reserved);
+extern int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, const void* payload, size_t length, bool is_masked, bool is_final, unsigned char reserved);
 ```
 
 ### uws_create
 
 ```c
-extern int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, const void* payload, size_t length, bool masked, bool final, unsigned char reserved);
+extern int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, const void* payload, size_t length, bool is_masked, bool is_final, unsigned char reserved);
 ```
 
-**SRS_UWS_FRAME_ENCODER_01_001: [** `uws_frame_encoder_encode` shall encode the information given in `opcode`, `payload`, `length`, `masked`, `final` and `reserved` according to the RFC6455 into the `encode_buffer` argument.**]**
-On success `uws_frame_encoder_encode` shall return 0.
-If the argument `encode_buffer` is NULL then `uws_frame_encoder_create` shall fail and return a non-zero value.
-The buffer `encode_buffer` shall be resized accordingly using `BUFFER_resize`.
+**SRS_UWS_FRAME_ENCODER_01_001: [** `uws_frame_encoder_encode` shall encode the information given in `opcode`, `payload`, `length`, `is_masked`, `is_final` and `reserved` according to the RFC6455 into the `encode_buffer` argument.**]**
+**SRS_UWS_FRAME_ENCODER_01_044: [** On success `uws_frame_encoder_encode` shall return 0. **]**
+**SRS_UWS_FRAME_ENCODER_01_045: [** If the argument `encode_buffer` is NULL then `uws_frame_encoder_encode` shall fail and return a non-zero value. **]**
+**SRS_UWS_FRAME_ENCODER_01_046: [** The buffer `encode_buffer` shall be resized accordingly using `BUFFER_resize`. **]**
 
 ### RFC6455 relevant parts
 
@@ -97,7 +97,7 @@ The buffer `encode_buffer` shall be resized accordingly using `BUFFER_resize`.
 
    Payload length:  7 bits, 7+16 bits, or 7+64 bits
 
-      **SRS_UWS_FRAME_ENCODER_01_018: [** The length of the "Payload data", in bytes: **]** XX**SRS_UWS_FRAME_ENCODER_01_164: [** if 0-125, that is the payload length. **]**
+      **SRS_UWS_FRAME_ENCODER_01_018: [** The length of the "Payload data", in bytes: **]** XX**SRS_UWS_FRAME_ENCODER_01_043: [** if 0-125, that is the payload length. **]**
       **SRS_UWS_FRAME_ENCODER_01_019: [** If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length. **]**
       **SRS_UWS_FRAME_ENCODER_01_020: [** If 127, the following 8 bytes interpreted as a 64-bit unsigned integer (the most significant bit MUST be 0) are the payload length. **]**
       **SRS_UWS_FRAME_ENCODER_01_021: [** Multibyte length quantities are expressed in network byte order. **]**
