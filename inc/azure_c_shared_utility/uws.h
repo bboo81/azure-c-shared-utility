@@ -33,9 +33,12 @@ DEFINE_ENUM(WS_SEND_FRAME_RESULT, WS_SEND_FRAME_RESULT_VALUES);
     WS_OPEN_ERROR_BYTES_RECEIVED_BEFORE_UNDERLYING_OPEN, \
     WS_OPEN_CANCELLED
 
+#define WS_FRAME_TYPE_TEXT      0x01
+#define WS_FRAME_TYPE_BINARY    0x02
+
 DEFINE_ENUM(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
 
-typedef void(*ON_WS_FRAME_RECEIVED)(void* context, const unsigned char* buffer, size_t size);
+typedef void(*ON_WS_FRAME_RECEIVED)(void* context, unsigned char frame_type, const unsigned char* buffer, size_t size);
 typedef void(*ON_WS_SEND_FRAME_COMPLETE)(void* context, WS_SEND_FRAME_RESULT ws_send_frame_result);
 typedef void(*ON_WS_OPEN_COMPLETE)(void* context, WS_OPEN_RESULT ws_open_result);
 typedef void(*ON_WS_CLOSE_COMPLETE)(void* context);

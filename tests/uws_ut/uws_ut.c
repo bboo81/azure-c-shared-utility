@@ -272,7 +272,7 @@ static void umocktypes_free_const_SOCKETIO_CONFIG_ptr(SOCKETIO_CONFIG** value)
 // consumer mocks
 MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_open_complete, void*, context, WS_OPEN_RESULT, ws_open_result);
 MOCK_FUNCTION_END()
-MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_frame_received, void*, context, const unsigned char*, buffer, size_t, size);
+MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_frame_received, void*, context, unsigned char, frame_type, const unsigned char*, buffer, size_t, size);
 MOCK_FUNCTION_END()
 MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_error, void*, context);
 MOCK_FUNCTION_END()
@@ -2132,6 +2132,38 @@ TEST_FUNCTION(when_1_extra_byte_is_received_the_open_complete_is_properly_indica
 
     // act
     g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_386: [ When a WebSocket data frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. ]*/
+TEST_FUNCTION(when_a_1_byte_binary_frame_is_received_it_shall_be_indicated_to_the_user)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n\0";
+    const unsigned char test_frame[] = { 0x81, 0x01, 0x42 };
+    const unsigned char expected_payload[] = { 0x42 };
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(test_on_ws_frame_received((void*)0x4243, WS_FRAME_TYPE_BINARY, IGNORED_PTR_ARG, 1))
+        .ValidateArgumentBuffer(3, expected_payload, sizeof(expected_payload));
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
 
     // assert
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());

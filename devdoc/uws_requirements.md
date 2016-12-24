@@ -205,7 +205,7 @@ X**SRS_UWS_01_381: [** If the status is 101, uws shall be considered OPEN and th
 **SRS_UWS_01_383: [** If the WebSocket upgrade request cannot be decoded an error shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_BAD_UPGRADE_RESPONSE`. **]**
 **SRS_UWS_01_384: [** Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames by passing them to `uws_frame_decoder_decode`. **]**
 **SRS_UWS_01_385: [** If the state of the uws instance is OPEN, the received bytes shall be used for decoding WebSocket frames. **]**
-**SRS_UWS_01_386: [** When a WebSocket frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. **]**
+**SRS_UWS_01_386: [** When a WebSocket data frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. **]**
 
 ### on_underlying_io_close_complete
 
