@@ -14,8 +14,6 @@
 #include "azure_c_shared_utility/platform.h"
 #include "azure_c_shared_utility/tlsio.h"
 #include "azure_c_shared_utility/crt_abstractions.h"
-#include "azure_c_shared_utility/uws_frame.h"
-#include "azure_c_shared_utility/uws_frame_decoder.h"
 
 typedef enum UWS_STATE_TAG
 {
@@ -48,7 +46,6 @@ typedef struct UWS_INSTANCE_TAG
     void* on_ws_close_complete_context;
     unsigned char* received_bytes;
     size_t received_bytes_count;
-    UWS_FRAME_DECODER_HANDLE uws_frame_decoder;
 } UWS_INSTANCE;
 
 UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl, const WS_PROTOCOL* protocols, size_t protocol_count)
@@ -306,12 +303,6 @@ static void indicate_ws_open_complete_error_and_close(UWS_INSTANCE* uws, WS_OPEN
     xio_close(uws->underlying_io, NULL, NULL);
 }
 
-static void on_ws_frame_decoded(void* context, UWS_FRAME_HANDLE ws_frame_handle)
-{
-    (void)context;
-    (void)ws_frame_handle;
-}
-
 static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_result)
 {
     UWS_HANDLE uws = context;
@@ -504,31 +495,22 @@ int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_w
         }
         else
         {
-            /* Codes_SRS_UWS_01_418: [ `uws_open` shall create a new WebSocket frame decoder by calling `uws_frame_decoder_create` and passing to it the `on_frame_decoded` callback. ]*/
-            uws->uws_frame_decoder = uws_frame_decoder_create(on_ws_frame_decoded, uws);
-            if (uws->uws_frame_decoder == NULL)
+            /* Codes_SRS_UWS_01_025: [ `uws_open` shall open the underlying IO by calling `xio_open` and providing the IO handle created in `uws_create` as argument. ]*/
+            /* Codes_SRS_UWS_01_367: [ The callbacks `on_underlying_io_open_complete`, `on_underlying_io_bytes_received` and `on_underlying_io_error` shall be passed as arguments to `xio_open`. ]*/
+            if (xio_open(uws->underlying_io, on_underlying_io_open_complete, uws, on_underlying_io_bytes_received, uws, on_underlying_io_error, uws) != 0)
             {
+                /* Codes_SRS_UWS_01_028: [ If opening the underlying IO fails then `uws_open` shall fail and return a non-zero value. ]*/
+                LogError("Opening the underlying IO failed");
                 result = __LINE__;
             }
             else
             {
-                /* Codes_SRS_UWS_01_025: [ `uws_open` shall open the underlying IO by calling `xio_open` and providing the IO handle created in `uws_create` as argument. ]*/
-                /* Codes_SRS_UWS_01_367: [ The callbacks `on_underlying_io_open_complete`, `on_underlying_io_bytes_received` and `on_underlying_io_error` shall be passed as arguments to `xio_open`. ]*/
-                if (xio_open(uws->underlying_io, on_underlying_io_open_complete, uws, on_underlying_io_bytes_received, uws, on_underlying_io_error, uws) != 0)
-                {
-                    /* Codes_SRS_UWS_01_028: [ If opening the underlying IO fails then `uws_open` shall fail and return a non-zero value. ]*/
-                    LogError("Opening the underlying IO failed");
-                    result = __LINE__;
-                }
-                else
-                {
-                    uws->uws_state = UWS_STATE_OPENING_UNDERLYING_IO;
-                    uws->on_ws_open_complete = on_ws_open_complete;
-                    uws->on_ws_open_complete_context = on_ws_open_complete_context;
+                uws->uws_state = UWS_STATE_OPENING_UNDERLYING_IO;
+                uws->on_ws_open_complete = on_ws_open_complete;
+                uws->on_ws_open_complete_context = on_ws_open_complete_context;
 
-                    /* Codes_SRS_UWS_01_026: [ On success, `uws_open` shall return 0. ]*/
-                    result = 0;
-                }
+                /* Codes_SRS_UWS_01_026: [ On success, `uws_open` shall return 0. ]*/
+                result = 0;
             }
         }
     }
@@ -576,9 +558,6 @@ int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* o
             }
             else
             {
-                /* Codes_SRS_UWS_01_419: [ `uws_close` shall destroy the WebSocket frame decoder created in `uws_open` by calling `uws_frame_decoder_destroy`. ]*/
-                uws_frame_decoder_destroy(uws->uws_frame_decoder);
-
                 /* Codes_SRS_UWS_01_396: [ On success `uws_close` shall return 0. ]*/
                 result = 0;
             }

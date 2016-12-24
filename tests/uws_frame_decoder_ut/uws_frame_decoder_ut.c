@@ -3,32 +3,11 @@
 
 #include "testrunnerswitcher.h"
 #include "umock_c.h"
-#include "umocktypes_charptr.h"
-#include "umocktypes_bool.h"
-
-/* TODO:
-- Implement a feature in umock_c that can say "compare this argument as a given type" for the config structures
-- Check the Websocket Upgrade request by breaking it into lines and parsing each line. Test on_underlying_io_open_complete_with_OK_prepares_and_sends_the_WebSocket_upgrade_request
-*/
 
 #define ENABLE_MOCKS
 
-#include "azure_c_shared_utility/xio.h"
-#include "azure_c_shared_utility/shared_util_options.h"
-#include "azure_c_shared_utility/crt_abstractions.h"
-#include "azure_c_shared_utility/singlylinkedlist.h"
-#include "azure_c_shared_utility/tlsio.h"
-
-TEST_DEFINE_ENUM_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT_VALUES);
-IMPLEMENT_UMOCK_C_ENUM_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT_VALUES);
-TEST_DEFINE_ENUM_TYPE(IO_SEND_RESULT, IO_SEND_RESULT_VALUES);
-IMPLEMENT_UMOCK_C_ENUM_TYPE(IO_SEND_RESULT, IO_SEND_RESULT_VALUES);
-
-static const void** list_items = NULL;
-static size_t list_item_count = 0;
-static const SINGLYLINKEDLIST_HANDLE TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE = (SINGLYLINKEDLIST_HANDLE)0x4242;
-static const LIST_ITEM_HANDLE TEST_LIST_ITEM_HANDLE = (LIST_ITEM_HANDLE)0x4243;
-static const XIO_HANDLE TEST_IO_HANDLE = (XIO_HANDLE)0x4244;
+#include "azure_c_shared_utility/uws_frame.h"
+#include "azure_c_shared_utility/uws_frame_decoder.h"
 
 static size_t currentmalloc_call;
 static size_t whenShallmalloc_fail;
@@ -118,204 +97,14 @@ static int my_singlylinkedlist_remove(SINGLYLINKEDLIST_HANDLE list, LIST_ITEM_HA
     return singlylinkedlist_remove_result;
 }
 
-static LIST_ITEM_HANDLE my_singlylinkedlist_get_head_item(SINGLYLINKEDLIST_HANDLE list)
-{
-    LIST_ITEM_HANDLE list_item_handle = NULL;
-    (void)list;
-    if (list_item_count > 0)
-    {
-        list_item_handle = (LIST_ITEM_HANDLE)1;
-    }
-    else
-    {
-        list_item_handle = NULL;
-    }
-    return list_item_handle;
-}
-
-LIST_ITEM_HANDLE my_singlylinkedlist_add(SINGLYLINKEDLIST_HANDLE list, const void* item)
-{
-    (void)list;
-    return add_to_list(item);
-}
-
-const void* my_singlylinkedlist_item_get_value(LIST_ITEM_HANDLE item_handle)
-{
-    return (const void*)list_items[(size_t)item_handle - 1];
-}
-
-LIST_ITEM_HANDLE my_singlylinkedlist_find(SINGLYLINKEDLIST_HANDLE handle, LIST_MATCH_FUNCTION match_function, const void* match_context)
-{
-    size_t i;
-    const void* found_item = NULL;
-    (void)handle;
-    for (i = 0; i < list_item_count; i++)
-    {
-        if (match_function((LIST_ITEM_HANDLE)list_items[i], match_context))
-        {
-            found_item = list_items[i];
-            break;
-        }
-    }
-    return (LIST_ITEM_HANDLE)found_item;
-}
-
 #include "azure_c_shared_utility/gballoc.h"
-#include "azure_c_shared_utility/socketio.h"
-#include "azure_c_shared_utility/platform.h"
 
 #undef ENABLE_MOCKS
 
-#include "azure_c_shared_utility/uws.h"
-
-static const WS_PROTOCOL protocols[] = { { "test_protocol" } };
-
-TEST_DEFINE_ENUM_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
-IMPLEMENT_UMOCK_C_ENUM_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
-
-static char* umocktypes_stringify_const_SOCKETIO_CONFIG_ptr(const SOCKETIO_CONFIG** value)
-{
-    char* result = NULL;
-    char temp_buffer[1024];
-    int length;
-    length = sprintf(temp_buffer, "{ hostname = %s, port = %d, accepted_socket = %p }",
-        (*value)->hostname,
-        (*value)->port,
-        (*value)->accepted_socket);
-
-    if (length > 0)
-    {
-        result = (char*)malloc(strlen(temp_buffer) + 1);
-        if (result != NULL)
-        {
-            (void)memcpy(result, temp_buffer, strlen(temp_buffer) + 1);
-        }
-    }
-
-    return result;
-}
-
-static int umocktypes_are_equal_const_SOCKETIO_CONFIG_ptr(const SOCKETIO_CONFIG** left, const SOCKETIO_CONFIG** right)
-{
-    int result;
-
-    if ((left == NULL) ||
-        (right == NULL))
-    {
-        result = -1;
-    }
-    else
-    {
-        result = ((*left)->port == (*right)->port);
-        result = result && ((*left)->accepted_socket == (*right)->accepted_socket);
-        if (strcmp((*left)->hostname, (*right)->hostname) != 0)
-        {
-            result = 0;
-        }
-    }
-
-    return result;
-}
-
-static char* copy_string(const char* source)
-{
-    char* result;
-
-    if (source == NULL)
-    {
-        result = NULL;
-    }
-    else
-    {
-        size_t length = strlen(source);
-        result = (char*)malloc(length + 1);
-        (void)memcpy(result, source, length + 1);
-    }
-
-    return result;
-}
-
-static int umocktypes_copy_const_SOCKETIO_CONFIG_ptr(SOCKETIO_CONFIG** destination, const SOCKETIO_CONFIG** source)
-{
-    int result;
-
-    *destination = (SOCKETIO_CONFIG*)malloc(sizeof(SOCKETIO_CONFIG));
-    if (*destination == NULL)
-    {
-        result = __LINE__;
-    }
-    else
-    {
-        if ((*source)->hostname == NULL)
-        {
-            (*destination)->hostname = NULL;
-        }
-        else
-        {
-            (*destination)->hostname = copy_string((*source)->hostname);
-            (*destination)->port = (*source)->port;
-            (*destination)->accepted_socket = (*source)->accepted_socket;
-        }
-
-        result = 0;
-    }
-
-    return result;
-}
-
-static void umocktypes_free_const_SOCKETIO_CONFIG_ptr(SOCKETIO_CONFIG** value)
-{
-    free((void*)(*value)->hostname);
-    free(*value);
-}
-
-// consumer mocks
-MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_open_complete, void*, context, WS_OPEN_RESULT, ws_open_result);
-MOCK_FUNCTION_END()
-MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_frame_received, void*, context, const unsigned char*, buffer, size_t, size);
-MOCK_FUNCTION_END()
-MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_error, void*, context);
-MOCK_FUNCTION_END()
-MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_close_complete, void*, context);
-MOCK_FUNCTION_END()
-MOCK_FUNCTION_WITH_CODE(, void, test_on_ws_send_frame_complete, void*, context, WS_SEND_FRAME_RESULT, ws_send_frame_result)
-MOCK_FUNCTION_END()
-
-static ON_IO_OPEN_COMPLETE g_on_io_open_complete;
-static void* g_on_io_open_complete_context;
-static ON_BYTES_RECEIVED g_on_bytes_received;
-static void* g_on_bytes_received_context;
-static ON_IO_ERROR g_on_io_error;
-static void* g_on_io_error_context;
-
-static int my_xio_open(XIO_HANDLE xio, ON_IO_OPEN_COMPLETE on_io_open_complete, void* on_io_open_complete_context, ON_BYTES_RECEIVED on_bytes_received, void* on_bytes_received_context, ON_IO_ERROR on_io_error, void* on_io_error_context)
-{
-    (void)xio;
-    g_on_io_open_complete = on_io_open_complete;
-    g_on_io_open_complete_context = on_io_open_complete_context;
-    g_on_bytes_received = on_bytes_received;
-    g_on_bytes_received_context = on_bytes_received_context;
-    g_on_io_error = on_io_error;
-    g_on_io_error_context = on_io_error_context;
-    return 0;
-}
-
-static ON_IO_CLOSE_COMPLETE g_on_io_close_complete;
-static void* g_on_io_close_complete_context;
-
-static int my_xio_close(XIO_HANDLE xio, ON_IO_CLOSE_COMPLETE on_io_close_complete, void* callback_context)
-{
-    (void)xio;
-    g_on_io_close_complete = on_io_close_complete;
-    g_on_io_close_complete_context = callback_context;
-    return 0;
-}
+#include "azure_c_shared_utility/uws_frame_decoder.h"
 
 static TEST_MUTEX_HANDLE g_testByTest;
 static TEST_MUTEX_HANDLE g_dllByDll;
-
-static const IO_INTERFACE_DESCRIPTION* TEST_SOCKET_IO_INTERFACE_DESCRIPTION = (const IO_INTERFACE_DESCRIPTION*)0x4542;
-static const IO_INTERFACE_DESCRIPTION* TEST_TLS_IO_INTERFACE_DESCRIPTION = (const IO_INTERFACE_DESCRIPTION*)0x4543;
 
 DEFINE_ENUM_STRINGS(UMOCK_C_ERROR_CODE, UMOCK_C_ERROR_CODE_VALUES)
 
@@ -346,17 +135,10 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_GLOBAL_MOCK_HOOK(gballoc_realloc, my_gballoc_realloc);
     REGISTER_GLOBAL_MOCK_HOOK(gballoc_free, my_gballoc_free);
     REGISTER_GLOBAL_MOCK_HOOK(mallocAndStrcpy_s, my_mallocAndStrcpy_s);
-    REGISTER_GLOBAL_MOCK_HOOK(xio_open, my_xio_open);
-    REGISTER_GLOBAL_MOCK_HOOK(xio_close, my_xio_close);
-    REGISTER_GLOBAL_MOCK_RETURN(singlylinkedlist_create, TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE);
-    REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_remove, my_singlylinkedlist_remove);
-    REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_get_head_item, my_singlylinkedlist_get_head_item);
-    REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_add, my_singlylinkedlist_add);
-    REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_item_get_value, my_singlylinkedlist_item_get_value);
-    REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_find, my_singlylinkedlist_find);
     REGISTER_GLOBAL_MOCK_RETURN(socketio_get_interface_description, TEST_SOCKET_IO_INTERFACE_DESCRIPTION);
     REGISTER_GLOBAL_MOCK_RETURN(platform_get_default_tlsio, TEST_TLS_IO_INTERFACE_DESCRIPTION);
     REGISTER_GLOBAL_MOCK_RETURN(xio_create, TEST_IO_HANDLE);
+    REGISTER_GLOBAL_MOCK_RETURN(uws_frame_decoder_create, TEST_UWS_FRAME_DECODER);
     REGISTER_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT);
     REGISTER_TYPE(IO_SEND_RESULT, IO_SEND_RESULT);
     REGISTER_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT);
@@ -2112,7 +1894,7 @@ TEST_FUNCTION(when_all_but_1_bytes_are_received_from_the_response_no_open_comple
 }
 
 /* Tests_SRS_UWS_01_384: [ Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames by passing them to `uws_frame_decoder_decode`. ]*/
-TEST_FUNCTION(when_1_extra_byte_is_received_the_open_complete_is_properly_indicated_and_the_extra_byte_is_saved_for_decoding_frames)
+TEST_FUNCTION(when_1_extra_byte_is_received_the_open_complete_is_properly_indicated_and_the_extra_byte_is_passed_to_frame_decoder)
 {
     // arrange
     TLSIO_CONFIG tlsio_config;
@@ -2129,6 +1911,39 @@ TEST_FUNCTION(when_1_extra_byte_is_received_the_open_complete_is_properly_indica
 
     EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
     STRICT_EXPECTED_CALL(test_on_ws_open_complete((void*)0x4242, WS_OPEN_OK));
+    STRICT_EXPECTED_CALL(uws_frame_decoder_decode(TEST_UWS_FRAME_DECODER, IGNORED_PTR_ARG, 1))
+        .ValidateArgumentBuffer(2, test_upgrade_response + sizeof(test_upgrade_response) - 1, 1);
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_384: [ Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames by passing them to `uws_frame_decoder_decode`. ]*/
+TEST_FUNCTION(when_2_extra_byte_is_received_the_open_complete_is_properly_indicated_and_the_extra_byte_is_passed_to_frame_decoder)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\nAB";
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(test_on_ws_open_complete((void*)0x4242, WS_OPEN_OK));
+    STRICT_EXPECTED_CALL(uws_frame_decoder_decode(TEST_UWS_FRAME_DECODER, IGNORED_PTR_ARG, 1))
+        .ValidateArgumentBuffer(2, test_upgrade_response + sizeof(test_upgrade_response) - 2, 2);
 
     // act
     g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
