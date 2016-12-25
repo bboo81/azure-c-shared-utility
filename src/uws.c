@@ -845,12 +845,29 @@ int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* o
 
 int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, bool is_final, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* callback_context)
 {
-    (void)uws;
-    (void)buffer;
-    (void)size;
+    int result;
+
     (void)is_final;
     (void)on_ws_send_frame_complete;
     (void)callback_context;
 
-    return 0;
+    if (uws == NULL)
+    {
+        /* Codes_SRS_UWS_01_044: [ If any the arguments `uws` is NULL, `uws_send_frame` shall fail and return a non-zero value. ]*/
+        LogError("NULL uws handle.");
+        result = __LINE__;
+    }
+    else if ((buffer == NULL) &&
+        (size > 0))
+    {
+        /* Codes_SRS_UWS_01_045: [ If `size` is non-zero and `buffer` is NULL then `uws_send_frame` shall fail and return a non-zero value. ]*/
+        LogError("NULL buffer with %u size.", (unsigned int)size);
+        result = __LINE__;
+    }
+    else
+    {
+        result = 0;
+    }
+
+    return result;
 }
