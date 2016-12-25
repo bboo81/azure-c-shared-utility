@@ -18,6 +18,7 @@
 #include "azure_c_shared_utility/crt_abstractions.h"
 #include "azure_c_shared_utility/singlylinkedlist.h"
 #include "azure_c_shared_utility/tlsio.h"
+#include "azure_c_shared_utility/uws_frame_encoder.h"
 
 TEST_DEFINE_ENUM_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT_VALUES);
 IMPLEMENT_UMOCK_C_ENUM_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT_VALUES);
@@ -319,6 +320,11 @@ static TEST_MUTEX_HANDLE g_dllByDll;
 static const IO_INTERFACE_DESCRIPTION* TEST_SOCKET_IO_INTERFACE_DESCRIPTION = (const IO_INTERFACE_DESCRIPTION*)0x4542;
 static const IO_INTERFACE_DESCRIPTION* TEST_TLS_IO_INTERFACE_DESCRIPTION = (const IO_INTERFACE_DESCRIPTION*)0x4543;
 
+extern BUFFER_HANDLE real_BUFFER_new(void);
+extern void real_BUFFER_delete(BUFFER_HANDLE handle);
+extern unsigned char* real_BUFFER_u_char(BUFFER_HANDLE handle);
+extern size_t real_BUFFER_length(BUFFER_HANDLE handle);
+
 DEFINE_ENUM_STRINGS(UMOCK_C_ERROR_CODE, UMOCK_C_ERROR_CODE_VALUES)
 
 static void on_umock_c_error(UMOCK_C_ERROR_CODE error_code)
@@ -359,6 +365,10 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_GLOBAL_MOCK_RETURN(socketio_get_interface_description, TEST_SOCKET_IO_INTERFACE_DESCRIPTION);
     REGISTER_GLOBAL_MOCK_RETURN(platform_get_default_tlsio, TEST_TLS_IO_INTERFACE_DESCRIPTION);
     REGISTER_GLOBAL_MOCK_RETURN(xio_create, TEST_IO_HANDLE);
+    REGISTER_GLOBAL_MOCK_HOOK(BUFFER_new, real_BUFFER_new);
+    REGISTER_GLOBAL_MOCK_HOOK(BUFFER_delete, real_BUFFER_delete);
+    REGISTER_GLOBAL_MOCK_HOOK(BUFFER_u_char, real_BUFFER_u_char);
+    REGISTER_GLOBAL_MOCK_HOOK(BUFFER_length, real_BUFFER_length);
     REGISTER_TYPE(IO_OPEN_RESULT, IO_OPEN_RESULT);
     REGISTER_TYPE(IO_SEND_RESULT, IO_SEND_RESULT);
     REGISTER_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT);
@@ -376,6 +386,7 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_UMOCK_ALIAS_TYPE(ON_SEND_COMPLETE, void*);
     REGISTER_UMOCK_ALIAS_TYPE(UWS_FRAME_DECODER_HANDLE, void*);
     REGISTER_UMOCK_ALIAS_TYPE(ON_WS_FRAME_DECODED, void*);
+    REGISTER_UMOCK_ALIAS_TYPE(BUFFER_HANDLE, void*);
 }
 
 TEST_SUITE_CLEANUP(suite_cleanup)
@@ -420,6 +431,7 @@ TEST_FUNCTION_CLEANUP(method_cleanup)
 /* Tests_SRS_UWS_01_004: [ The argument `hostname` shall be copied for later use. ]*/
 /* Tests_SRS_UWS_01_403: [ The argument `port` shall be copied for later use. ]*/
 /* Tests_SRS_UWS_01_404: [ The argument `resource_name` shall be copied for later use. ]*/
+/* Tests_SRS_UWS_01_422: [ `uws_create` shall create a buffer to be used for encoding outgoing frames by calling `BUFFER_new`. ]*/
 TEST_FUNCTION(uws_create_with_valid_args_no_ssl_succeeds)
 {
 	// arrange
@@ -431,6 +443,7 @@ TEST_FUNCTION(uws_create_with_valid_args_no_ssl_succeeds)
     socketio_config.port = 80;
 
 	EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new());
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
         .IgnoreArgument_destination();
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "111"))
@@ -492,6 +505,7 @@ TEST_FUNCTION(uws_create_with_valid_args_no_ssl_port_different_than_80_succeeds)
     socketio_config.port = 81;
 
     EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new());
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
         .IgnoreArgument_destination();
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "333"))
@@ -527,6 +541,7 @@ TEST_FUNCTION(uws_create_with_NULL_protocols_succeeds)
     socketio_config.port = 81;
 
     EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new());
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
         .IgnoreArgument_destination();
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "333"))
@@ -613,8 +628,8 @@ TEST_FUNCTION(when_allocating_memory_for_the_new_uws_instance_fails_then_uws_cre
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 }
 
-/* Tests_SRS_UWS_01_392: [ If allocating memory for the copy of the `hostname` argument fails, then `uws_create` shall return NULL. ]*/
-TEST_FUNCTION(when_allocating_memory_for_the_hostname_copy_fails_then_uws_create_fails)
+/* Tests_SRS_UWS_01_423: [ If `BUFFER_new` fails  then `uws_create` shall fail and return NULL. ]*/
+TEST_FUNCTION(when_BUFFER_new_fails_then_uws_create_fails)
 {
     // arrange
     SOCKETIO_CONFIG socketio_config;
@@ -623,9 +638,37 @@ TEST_FUNCTION(when_allocating_memory_for_the_hostname_copy_fails_then_uws_create
     socketio_config.port = 80;
 
     EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .SetReturn(NULL);
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    UWS_HANDLE uws = uws_create("test_host", 80, "bbb", false, protocols, sizeof(protocols) / sizeof(protocols[0]));
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_392: [ If allocating memory for the copy of the `hostname` argument fails, then `uws_create` shall return NULL. ]*/
+TEST_FUNCTION(when_allocating_memory_for_the_hostname_copy_fails_then_uws_create_fails)
+{
+    // arrange
+    SOCKETIO_CONFIG socketio_config;
+    BUFFER_HANDLE buffer_handle;
+
+    socketio_config.accepted_socket = NULL;
+    socketio_config.hostname = "test_host";
+    socketio_config.port = 80;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
         .IgnoreArgument_destination()
         .SetReturn(1);
+    STRICT_EXPECTED_CALL(BUFFER_delete(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle);
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
 
     // act
@@ -641,17 +684,23 @@ TEST_FUNCTION(when_allocating_memory_for_the_resource_name_copy_fails_then_uws_c
 {
     // arrange
     SOCKETIO_CONFIG socketio_config;
+    BUFFER_HANDLE buffer_handle;
+
     socketio_config.accepted_socket = NULL;
     socketio_config.hostname = "test_host";
     socketio_config.port = 80;
 
     EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
         .IgnoreArgument_destination();
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_resource/1"))
         .IgnoreArgument_destination()
         .SetReturn(1);
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_delete(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle);
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
 
     // act
@@ -668,12 +717,15 @@ TEST_FUNCTION(when_creating_the_pending_sends_list_fails_then_uws_create_fails)
     // arrange
     SOCKETIO_CONFIG socketio_config;
     UWS_HANDLE uws;
+    BUFFER_HANDLE buffer_handle;
 
     socketio_config.accepted_socket = NULL;
     socketio_config.hostname = "test_host";
     socketio_config.port = 80;
 
     EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
         .IgnoreArgument_destination();
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_resource/1"))
@@ -682,6 +734,8 @@ TEST_FUNCTION(when_creating_the_pending_sends_list_fails_then_uws_create_fails)
         .SetReturn(NULL);
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_delete(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle);
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
 
     // act
@@ -697,11 +751,15 @@ TEST_FUNCTION(when_getting_the_socket_interface_description_fails_then_uws_creat
 {
     // arrange
     SOCKETIO_CONFIG socketio_config;
+    BUFFER_HANDLE buffer_handle;
+
     socketio_config.accepted_socket = NULL;
     socketio_config.hostname = "test_host";
     socketio_config.port = 80;
 
     EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
         .IgnoreArgument_destination();
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_resource/1"))
@@ -712,6 +770,8 @@ TEST_FUNCTION(when_getting_the_socket_interface_description_fails_then_uws_creat
     STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_delete(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle);
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
 
     // act
@@ -728,12 +788,15 @@ TEST_FUNCTION(when_creating_the_io_handle_fails_then_uws_create_fails)
     // arrange
     SOCKETIO_CONFIG socketio_config;
     UWS_HANDLE uws;
+    BUFFER_HANDLE buffer_handle;
 
     socketio_config.accepted_socket = NULL;
     socketio_config.hostname = "test_host";
     socketio_config.port = 80;
 
     EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
         .IgnoreArgument_destination();
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_resource/1"))
@@ -746,6 +809,8 @@ TEST_FUNCTION(when_creating_the_io_handle_fails_then_uws_create_fails)
     STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_delete(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle);
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
 
     // act
@@ -770,6 +835,7 @@ TEST_FUNCTION(uws_create_with_valid_args_ssl_succeeds)
     tlsio_config.port = 443;
 
     EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new());
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
         .IgnoreArgument_destination();
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_resource/23"))
@@ -807,6 +873,7 @@ TEST_FUNCTION(uws_create_with_valid_args_ssl_port_different_than_443_succeeds)
     tlsio_config.port = 444;
 
     EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new());
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
         .IgnoreArgument_destination();
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_resource/23"))
@@ -836,11 +903,14 @@ TEST_FUNCTION(when_getting_the_tlsio_interface_fails_then_uws_create_fails)
     // arrange
     TLSIO_CONFIG tlsio_config;
     UWS_HANDLE uws;
+    BUFFER_HANDLE buffer_handle;
 
     tlsio_config.hostname = "test_host";
     tlsio_config.port = 444;
 
     EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
         .IgnoreArgument_destination();
     STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_resource/23"))
@@ -851,6 +921,8 @@ TEST_FUNCTION(when_getting_the_tlsio_interface_fails_then_uws_create_fails)
     STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_delete(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle);
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
 
     // act
@@ -866,6 +938,7 @@ TEST_FUNCTION(when_getting_the_tlsio_interface_fails_then_uws_create_fails)
 /* Tests_SRS_UWS_01_019: [ `uws_destroy` shall free all resources associated with the uws instance. ]*/
 /* Tests_SRS_UWS_01_023: [ `uws_destroy` shall destroy the underlying IO created in `uws_create` by calling `xio_destroy`. ]*/
 /* Tests_SRS_UWS_01_024: [ `uws_destroy` shall free the list used to track the pending sends by calling `singlylinkedlist_destroy`. ]*/
+/* Tests_SRS_UWS_01_424: [ `uws_destroy` shall free the buffer allocated in `uws_create` by calling `BUFFER_delete`. ]*/
 TEST_FUNCTION(uws_destroy_fress_the_resources)
 {
     // arrange
@@ -884,6 +957,7 @@ TEST_FUNCTION(uws_destroy_fress_the_resources)
     STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(BUFFER_delete(IGNORED_PTR_ARG));
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
 
     // act

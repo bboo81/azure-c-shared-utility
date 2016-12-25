@@ -58,9 +58,11 @@ extern void uws_dowork(UWS_HANDLE uws);
 extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl, const WS_PROTOCOL* protocols, size_t protocol_count);
 ```
 
-XX**SRS_UWS_01_001: [**`uws_create` shall create an instance of uws and return a non-NULL handle to it.**]**
+XX**SRS_UWS_01_001: [** `uws_create` shall create an instance of uws and return a non-NULL handle to it.**]**
 XX**SRS_UWS_01_002: [** If any of the arguments `hostname` and `resource_name` is NULL then `uws_create` shall return NULL. **]**
 XX**SRS_UWS_01_003: [** If allocating memory for the new uws instance fails then `uws_create` shall return NULL. **]**
+XX**SRS_UWS_01_422: [** `uws_create` shall create a buffer to be used for encoding outgoing frames by calling `BUFFER_new`. **]**
+XX**SRS_UWS_01_423: [** If `BUFFER_new` fails  then `uws_create` shall fail and return NULL. **]**
 XX**SRS_UWS_01_004: [** The argument `hostname` shall be copied for later use. **]**
 XX**SRS_UWS_01_392: [** If allocating memory for the copy of the `hostname` argument fails, then `uws_create` shall return NULL. **]**
 XX**SRS_UWS_01_403: [** The argument `port` shall be copied for later use. **]**
@@ -94,6 +96,7 @@ extern void uws_destroy(UWS_HANDLE uws);
 
 XX**SRS_UWS_01_019: [** `uws_destroy` shall free all resources associated with the uws instance. **]**
 XX**SRS_UWS_01_020: [** If `uws` is NULL, `uws_destroy` shall do nothing. **]** 
+**SRS_UWS_01_424: [** `uws_destroy` shall free the buffer allocated in `uws_create` by calling `BUFFER_delete`. **]**
 **SRS_UWS_01_021: [** `uws_destroy` shall perform a close action if the uws instance has already been open. **]**
 **SRS_UWS_01_022: [** `uws_destroy` shall execute a close action if an open is in progress. **]**
 XX**SRS_UWS_01_023: [** `uws_destroy` shall destroy the underlying IO created in `uws_create` by calling `xio_destroy`. **]**

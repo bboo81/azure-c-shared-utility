@@ -47,6 +47,7 @@ extern int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, WS_FRAME_TYPE o
 XX**SRS_UWS_FRAME_ENCODER_01_001: [** `uws_frame_encoder_encode` shall encode the information given in `opcode`, `payload`, `length`, `is_masked`, `is_final` and `reserved` according to the RFC6455 into the `encode_buffer` argument.**]**
 XX**SRS_UWS_FRAME_ENCODER_01_044: [** On success `uws_frame_encoder_encode` shall return 0. **]**
 XX**SRS_UWS_FRAME_ENCODER_01_045: [** If the argument `encode_buffer` is NULL then `uws_frame_encoder_encode` shall fail and return a non-zero value. **]**
+XX**SRS_UWS_FRAME_ENCODER_01_054: [** If `length` is greater than 0 and payload is NULL, then `uws_frame_encoder_encode` shall fail and return a non-zero value. **]**
 XX**SRS_UWS_FRAME_ENCODER_01_048: [** The buffer `encode_buffer` shall be reset by calling `BUFFER_unbuild`. **]**
 XX**SRS_UWS_FRAME_ENCODER_01_049: [** If `BUFFER_unbuild` fails then `uws_frame_encoder_encode` shall fail and return a non-zero value. **]**
 XX**SRS_UWS_FRAME_ENCODER_01_046: [** The buffer `encode_buffer` shall be resized accordingly using `BUFFER_enlarge`. **]**

@@ -15,6 +15,7 @@
 #include "azure_c_shared_utility/platform.h"
 #include "azure_c_shared_utility/tlsio.h"
 #include "azure_c_shared_utility/crt_abstractions.h"
+#include "azure_c_shared_utility/buffer_.h"
 
 typedef enum UWS_STATE_TAG
 {
@@ -64,6 +65,7 @@ typedef struct UWS_INSTANCE_TAG
     unsigned char* received_bytes;
     size_t received_bytes_count;
     UWS_FRAME_DECODER_STATE frame_decoder_state;
+    BUFFER_HANDLE encode_buffer;
 } UWS_INSTANCE;
 
 UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resource_name, bool use_ssl, const WS_PROTOCOL* protocols, size_t protocol_count)
@@ -107,166 +109,184 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resou
             }
             else
             {
-                /* Codes_SRS_UWS_01_004: [ The argument `hostname` shall be copied for later use. ]*/
-                if (mallocAndStrcpy_s(&result->hostname, hostname) != 0)
+                /* Codes_SRS_UWS_01_422: [ `uws_create` shall create a buffer to be used for encoding outgoing frames by calling `BUFFER_new`. ]*/
+                result->encode_buffer = BUFFER_new();
+                if (result->encode_buffer == NULL)
                 {
-                    /* Codes_SRS_UWS_01_392: [ If allocating memory for the copy of the `hostname` argument fails, then `uws_create` shall return NULL. ]*/
-                    LogError("Could not copy hostname.");
+                    /* Codes_SRS_UWS_01_423: [ If `BUFFER_new` fails  then `uws_create` shall fail and return NULL. ]*/
+                    LogError("Could not allocate encode buffer.");
                     free(result);
                     result = NULL;
                 }
                 else
                 {
-                    /* Codes_SRS_UWS_01_404: [ The argument `resource_name` shall be copied for later use. ]*/
-                    if (mallocAndStrcpy_s(&result->resource_name, resource_name) != 0)
+                    /* Codes_SRS_UWS_01_004: [ The argument `hostname` shall be copied for later use. ]*/
+                    if (mallocAndStrcpy_s(&result->hostname, hostname) != 0)
                     {
-                        /* Codes_SRS_UWS_01_405: [ If allocating memory for the copy of the `resource` argument fails, then `uws_create` shall return NULL. ]*/
-                        LogError("Could not copy resource.");
-                        free(result->hostname);
+                        /* Codes_SRS_UWS_01_392: [ If allocating memory for the copy of the `hostname` argument fails, then `uws_create` shall return NULL. ]*/
+                        LogError("Could not copy hostname.");
+                        BUFFER_delete(result->encode_buffer);
                         free(result);
                         result = NULL;
                     }
                     else
                     {
-                        /* Codes_SRS_UWS_01_017: [ `uws_create` shall create a pending send IO list that is to be used to queue send packets by calling `singlylinkedlist_create`. ]*/
-                        result->pending_sends = singlylinkedlist_create();
-                        if (result->pending_sends == NULL)
+                        /* Codes_SRS_UWS_01_404: [ The argument `resource_name` shall be copied for later use. ]*/
+                        if (mallocAndStrcpy_s(&result->resource_name, resource_name) != 0)
                         {
-                            /* Codes_SRS_UWS_01_018: [ If `singlylinkedlist_create` fails then `uws_create` shall fail and return NULL. ]*/
-                            LogError("Could not allocate pending send frames list");
-                            free(result->resource_name);
+                            /* Codes_SRS_UWS_01_405: [ If allocating memory for the copy of the `resource` argument fails, then `uws_create` shall return NULL. ]*/
+                            LogError("Could not copy resource.");
                             free(result->hostname);
+                            BUFFER_delete(result->encode_buffer);
                             free(result);
                             result = NULL;
                         }
                         else
                         {
-                            if (use_ssl == true)
+                            /* Codes_SRS_UWS_01_017: [ `uws_create` shall create a pending send IO list that is to be used to queue send packets by calling `singlylinkedlist_create`. ]*/
+                            result->pending_sends = singlylinkedlist_create();
+                            if (result->pending_sends == NULL)
                             {
-                                TLSIO_CONFIG tlsio_config;
-                                /* Codes_SRS_UWS_01_006: [ If `use_ssl` is 1 then `uws_create` shall obtain the interface used to create a tlsio instance by calling `platform_get_default_tlsio`. ]*/
-                                const IO_INTERFACE_DESCRIPTION* tlsio_interface = platform_get_default_tlsio();
-                                if (tlsio_interface == NULL)
-                                {
-                                    /* Codes_SRS_UWS_01_007: [ If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. ]*/
-                                    LogError("NULL TLSIO interface description");
-                                    result->underlying_io = NULL;
-                                }
-                                else
-                                {
-                                    /* Codes_SRS_UWS_01_013: [ The create arguments for the tls IO (when `use_ssl` is 1) shall have: ]*/
-                                    /* Codes_SRS_UWS_01_014: [ - `hostname` set to the `hostname` argument passed to `uws_create`. ]*/
-                                    /* Codes_SRS_UWS_01_015: [ - `port` set to the `port` argument passed to `uws_create`. ]*/
-                                    tlsio_config.hostname = hostname;
-                                    tlsio_config.port = port;
-
-                                    result->underlying_io = xio_create(tlsio_interface, &tlsio_config);
-                                    if (result->underlying_io == NULL)
-                                    {
-                                        LogError("Cannot create underlying TLS IO.");
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                SOCKETIO_CONFIG socketio_config;
-                                /* Codes_SRS_UWS_01_005: [ If `use_ssl` is 0 then `uws_create` shall obtain the interface used to create a socketio instance by calling `socketio_get_interface_description`. ]*/
-                                const IO_INTERFACE_DESCRIPTION* socketio_interface = socketio_get_interface_description();
-                                if (socketio_interface == NULL)
-                                {
-                                    /* Codes_SRS_UWS_01_007: [ If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. ]*/
-                                    LogError("NULL socketio interface description");
-                                    result->underlying_io = NULL;
-                                }
-                                else
-                                {
-                                    /* Codes_SRS_UWS_01_010: [ The create arguments for the socket IO (when `use_ssl` is 0) shall have: ]*/
-                                    /* Codes_SRS_UWS_01_011: [ - `hostname` set to the `hostname` argument passed to `uws_create`. ]*/
-                                    /* Codes_SRS_UWS_01_012: [ - `port` set to the `port` argument passed to `uws_create`. ]*/
-                                    socketio_config.hostname = hostname;
-                                    socketio_config.port = port;
-                                    socketio_config.accepted_socket = NULL;
-
-                                    /* Codes_SRS_UWS_01_008: [ The obtained interface shall be used to create the IO used as underlying IO by the newly created uws instance. ]*/
-                                    /* Codes_SRS_UWS_01_009: [ The underlying IO shall be created by calling `xio_create`. ]*/
-                                    result->underlying_io = xio_create(socketio_interface, &socketio_config);
-                                    if (result->underlying_io == NULL)
-                                    {
-                                        LogError("Cannot create underlying socket IO.");
-                                    }
-                                }
-                            }
-
-                            if (result->underlying_io == NULL)
-                            {
-                                /* Tests_SRS_UWS_01_016: [ If `xio_create` fails, then `uws_create` shall fail and return NULL. ]*/
-                                singlylinkedlist_destroy(result->pending_sends);
+                                /* Codes_SRS_UWS_01_018: [ If `singlylinkedlist_create` fails then `uws_create` shall fail and return NULL. ]*/
+                                LogError("Could not allocate pending send frames list");
                                 free(result->resource_name);
                                 free(result->hostname);
+                                BUFFER_delete(result->encode_buffer);
                                 free(result);
                                 result = NULL;
                             }
                             else
                             {
-                                result->uws_state = UWS_STATE_CLOSED;
-                                /* Codes_SRS_UWS_01_403: [ The argument `port` shall be copied for later use. ]*/
-                                result->port = port;
-
-                                result->on_ws_open_complete = NULL;
-                                result->on_ws_open_complete_context = NULL;
-                                result->on_ws_frame_received = NULL;
-                                result->on_ws_frame_received_context = NULL;
-                                result->on_ws_error = NULL;
-                                result->on_ws_error_context = NULL;
-                                result->on_ws_close_complete = NULL;
-                                result->on_ws_close_complete_context = NULL;
-                                result->received_bytes = NULL;
-                                result->received_bytes_count = 0;
-
-                                result->protocol_count = protocol_count;
-
-                                /* Codes_SRS_UWS_01_410: [ The `protocols` argument shall be allowed to be NULL, in which case no protocol is to be specified by the client in the upgrade request. ]*/
-                                if (protocols != NULL)
+                                if (use_ssl == true)
                                 {
-                                    result->protocols = (WS_INSTANCE_PROTOCOL*)malloc(sizeof(WS_INSTANCE_PROTOCOL) * protocol_count);
-                                    if (result->protocols == NULL)
+                                    TLSIO_CONFIG tlsio_config;
+                                    /* Codes_SRS_UWS_01_006: [ If `use_ssl` is 1 then `uws_create` shall obtain the interface used to create a tlsio instance by calling `platform_get_default_tlsio`. ]*/
+                                    const IO_INTERFACE_DESCRIPTION* tlsio_interface = platform_get_default_tlsio();
+                                    if (tlsio_interface == NULL)
                                     {
-                                        xio_destroy(result->underlying_io);
-                                        singlylinkedlist_destroy(result->pending_sends);
-                                        free(result->resource_name);
-                                        free(result->hostname);
-                                        free(result);
-                                        result = NULL;
+                                        /* Codes_SRS_UWS_01_007: [ If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. ]*/
+                                        LogError("NULL TLSIO interface description");
+                                        result->underlying_io = NULL;
                                     }
                                     else
                                     {
-                                        for (i = 0; i < protocol_count; i++)
+                                        /* Codes_SRS_UWS_01_013: [ The create arguments for the tls IO (when `use_ssl` is 1) shall have: ]*/
+                                        /* Codes_SRS_UWS_01_014: [ - `hostname` set to the `hostname` argument passed to `uws_create`. ]*/
+                                        /* Codes_SRS_UWS_01_015: [ - `port` set to the `port` argument passed to `uws_create`. ]*/
+                                        tlsio_config.hostname = hostname;
+                                        tlsio_config.port = port;
+
+                                        result->underlying_io = xio_create(tlsio_interface, &tlsio_config);
+                                        if (result->underlying_io == NULL)
                                         {
-                                            if (mallocAndStrcpy_s(&result->protocols[i].protocol, protocols[i].protocol) != 0)
-                                            {
-                                                break;
-                                            }
+                                            LogError("Cannot create underlying TLS IO.");
                                         }
+                                    }
+                                }
+                                else
+                                {
+                                    SOCKETIO_CONFIG socketio_config;
+                                    /* Codes_SRS_UWS_01_005: [ If `use_ssl` is 0 then `uws_create` shall obtain the interface used to create a socketio instance by calling `socketio_get_interface_description`. ]*/
+                                    const IO_INTERFACE_DESCRIPTION* socketio_interface = socketio_get_interface_description();
+                                    if (socketio_interface == NULL)
+                                    {
+                                        /* Codes_SRS_UWS_01_007: [ If obtaining the underlying IO interface fails, then `uws_create` shall fail and return NULL. ]*/
+                                        LogError("NULL socketio interface description");
+                                        result->underlying_io = NULL;
+                                    }
+                                    else
+                                    {
+                                        /* Codes_SRS_UWS_01_010: [ The create arguments for the socket IO (when `use_ssl` is 0) shall have: ]*/
+                                        /* Codes_SRS_UWS_01_011: [ - `hostname` set to the `hostname` argument passed to `uws_create`. ]*/
+                                        /* Codes_SRS_UWS_01_012: [ - `port` set to the `port` argument passed to `uws_create`. ]*/
+                                        socketio_config.hostname = hostname;
+                                        socketio_config.port = port;
+                                        socketio_config.accepted_socket = NULL;
 
-                                        if (i < protocol_count)
+                                        /* Codes_SRS_UWS_01_008: [ The obtained interface shall be used to create the IO used as underlying IO by the newly created uws instance. ]*/
+                                        /* Codes_SRS_UWS_01_009: [ The underlying IO shall be created by calling `xio_create`. ]*/
+                                        result->underlying_io = xio_create(socketio_interface, &socketio_config);
+                                        if (result->underlying_io == NULL)
                                         {
-                                            size_t j;
+                                            LogError("Cannot create underlying socket IO.");
+                                        }
+                                    }
+                                }
 
-                                            for (j = 0; j < i; j++)
-                                            {
-                                                free(result->protocols[j].protocol);
-                                            }
-                                            free(result->protocols);
+                                if (result->underlying_io == NULL)
+                                {
+                                    /* Tests_SRS_UWS_01_016: [ If `xio_create` fails, then `uws_create` shall fail and return NULL. ]*/
+                                    singlylinkedlist_destroy(result->pending_sends);
+                                    free(result->resource_name);
+                                    free(result->hostname);
+                                    BUFFER_delete(result->encode_buffer);
+                                    free(result);
+                                    result = NULL;
+                                }
+                                else
+                                {
+                                    result->uws_state = UWS_STATE_CLOSED;
+                                    /* Codes_SRS_UWS_01_403: [ The argument `port` shall be copied for later use. ]*/
+                                    result->port = port;
+
+                                    result->on_ws_open_complete = NULL;
+                                    result->on_ws_open_complete_context = NULL;
+                                    result->on_ws_frame_received = NULL;
+                                    result->on_ws_frame_received_context = NULL;
+                                    result->on_ws_error = NULL;
+                                    result->on_ws_error_context = NULL;
+                                    result->on_ws_close_complete = NULL;
+                                    result->on_ws_close_complete_context = NULL;
+                                    result->received_bytes = NULL;
+                                    result->received_bytes_count = 0;
+
+                                    result->protocol_count = protocol_count;
+
+                                    /* Codes_SRS_UWS_01_410: [ The `protocols` argument shall be allowed to be NULL, in which case no protocol is to be specified by the client in the upgrade request. ]*/
+                                    if (protocols != NULL)
+                                    {
+                                        result->protocols = (WS_INSTANCE_PROTOCOL*)malloc(sizeof(WS_INSTANCE_PROTOCOL) * protocol_count);
+                                        if (result->protocols == NULL)
+                                        {
                                             xio_destroy(result->underlying_io);
                                             singlylinkedlist_destroy(result->pending_sends);
                                             free(result->resource_name);
                                             free(result->hostname);
+                                            BUFFER_delete(result->encode_buffer);
                                             free(result);
                                             result = NULL;
                                         }
                                         else
                                         {
-                                            result->protocol_count = protocol_count;
+                                            for (i = 0; i < protocol_count; i++)
+                                            {
+                                                if (mallocAndStrcpy_s(&result->protocols[i].protocol, protocols[i].protocol) != 0)
+                                                {
+                                                    break;
+                                                }
+                                            }
+
+                                            if (i < protocol_count)
+                                            {
+                                                size_t j;
+
+                                                for (j = 0; j < i; j++)
+                                                {
+                                                    free(result->protocols[j].protocol);
+                                                }
+                                                free(result->protocols);
+                                                xio_destroy(result->underlying_io);
+                                                singlylinkedlist_destroy(result->pending_sends);
+                                                free(result->resource_name);
+                                                free(result->hostname);
+                                                BUFFER_delete(result->encode_buffer);
+                                                free(result);
+                                                result = NULL;
+                                            }
+                                            else
+                                            {
+                                                result->protocol_count = protocol_count;
+                                            }
                                         }
                                     }
                                 }
@@ -308,6 +328,9 @@ void uws_destroy(UWS_HANDLE uws)
         singlylinkedlist_destroy(uws->pending_sends);
         free(uws->resource_name);
         free(uws->hostname);
+
+        /* Codes_SRS_UWS_01_424: [ `uws_destroy` shall free the buffer allocated in `uws_create` by calling `BUFFER_delete`. ]*/
+        BUFFER_delete(uws->encode_buffer);
         free(uws);
     }
 }
