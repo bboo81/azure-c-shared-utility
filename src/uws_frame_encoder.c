@@ -6,12 +6,15 @@
 #include <crtdbg.h>
 #endif
 #include <stdint.h>
+#include <stddef.h>
 #include "azure_c_shared_utility/gballoc.h"
+#include "azure_c_shared_utility/gb_rand.h"
 #include "azure_c_shared_utility/uws_frame_encoder.h"
 #include "azure_c_shared_utility/xlogging.h"
 #include "azure_c_shared_utility/buffer_.h"
+#include "azure_c_shared_utility/uniqueid.h"
 
-int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, const void* payload, size_t length, bool is_masked, bool is_final, unsigned char reserved)
+int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, WS_FRAME_TYPE opcode, const void* payload, size_t length, bool is_masked, bool is_final, unsigned char reserved)
 {
     int result;
 
@@ -25,6 +28,12 @@ int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, 
     {
         /* Codes_SRS_UWS_FRAME_ENCODER_01_052: [ If `reserved` has any bits set except the lowest 3 then `uws_frame_encoder_encode` shall fail and return a non-zero value. ]*/
         LogError("Bad reserved value: 0x%02x", reserved);
+        result = __LINE__;
+    }
+    else if (opcode > 0x0F)
+    {
+        /* Codes_SRS_UWS_FRAME_ENCODER_01_006: [ If an unknown opcode is received, the receiving endpoint MUST _Fail the WebSocket Connection_. ]*/
+        LogError("Invalid opcode: 0x%02x", opcode);
         result = __LINE__;
     }
     else
@@ -52,6 +61,11 @@ int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, 
 
             }
 
+            if (is_masked)
+            {
+                needed_bytes += 4;
+            }
+
             header_bytes = needed_bytes;
             needed_bytes += length;
 
@@ -74,6 +88,14 @@ int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, 
                 }
                 else
                 {
+                    /* Codes_SRS_UWS_FRAME_ENCODER_01_007: [ *  %x0 denotes a continuation frame ]*/
+                    /* Codes_SRS_UWS_FRAME_ENCODER_01_008: [ *  %x1 denotes a text frame ]*/
+                    /* Codes_SRS_UWS_FRAME_ENCODER_01_009: [ *  %x2 denotes a binary frame ]*/
+                    /* Codes_SRS_UWS_FRAME_ENCODER_01_010: [ *  %x3-7 are reserved for further non-control frames ]*/
+                    /* Codes_SRS_UWS_FRAME_ENCODER_01_011: [ *  %x8 denotes a connection close ]*/
+                    /* Codes_SRS_UWS_FRAME_ENCODER_01_012: [ *  %x9 denotes a ping ]*/
+                    /* Codes_SRS_UWS_FRAME_ENCODER_01_013: [ *  %xA denotes a pong ]*/
+                    /* Codes_SRS_UWS_FRAME_ENCODER_01_014: [ *  %xB-F are reserved for further control frames ]*/
                     buffer[0] = opcode;
 
                     /* Codes_SRS_UWS_FRAME_ENCODER_01_002: [ Indicates that this is the final fragment in a message. ]*/
@@ -101,7 +123,14 @@ int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, 
 
                     if (is_masked)
                     {
+                        /* Codes_SRS_UWS_FRAME_ENCODER_01_015: [ Defines whether the "Payload data" is masked. ]*/
                         buffer[1] |= 0x80;
+
+                        /* Codes_SRS_UWS_FRAME_ENCODER_01_053: [ In order to obtain a 32 bit value for masking, `gb_rand` shall be used 4 times (for each byte). ]*/
+                        buffer[header_bytes - 4] = (unsigned char)gb_rand();
+                        buffer[header_bytes - 3] = (unsigned char)gb_rand();
+                        buffer[header_bytes - 2] = (unsigned char)gb_rand();
+                        buffer[header_bytes - 1] = (unsigned char)gb_rand();
                     }
 
                     if (length > 0)

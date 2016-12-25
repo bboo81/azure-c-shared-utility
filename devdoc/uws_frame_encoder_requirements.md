@@ -11,13 +11,37 @@ RFC6455 - The WebSocket Protocol.
 ## Exposed API
 
 ```c
+#define RESERVED_1  0x04
+#define RESERVED_2  0x02
+#define RESERVED_3  0x01
+
+#define WS_FRAME_TYPE_VALUES \
+    WS_CONTINUATION_FRAME = 0x00, \
+    WS_TEXT_FRAME = 0x01, \
+    WS_BINARY_FRAME = 0x02, \
+    WS_RESERVED_NON_CONTROL_FRAME_3 = 0x03, \
+    WS_RESERVED_NON_CONTROL_FRAME_4 = 0x04, \
+    WS_RESERVED_NON_CONTROL_FRAME_5 = 0x05, \
+    WS_RESERVED_NON_CONTROL_FRAME_6 = 0x06, \
+    WS_RESERVED_NON_CONTROL_FRAME_7 = 0x07, \
+    WS_CLOSE_FRAME = 0x08, \
+    WS_PING_FRAME = 0x09, \
+    WS_PONG_FRAME = 0x0A, \
+    WS_RESERVED_CONTROL_FRAME_B = 0x0B, \
+    WS_RESERVED_CONTROL_FRAME_C = 0x0C, \
+    WS_RESERVED_CONTROL_FRAME_D = 0x0D, \
+    WS_RESERVED_CONTROL_FRAME_E = 0x0E, \
+    WS_RESERVED_CONTROL_FRAME_F = 0x0F
+
+DEFINE_ENUM(WS_FRAME_TYPE, WS_FRAME_TYPE_VALUES);
+
 extern int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, const void* payload, size_t length, bool is_masked, bool is_final, unsigned char reserved);
 ```
 
 ### uws_create
 
 ```c
-extern int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, const void* payload, size_t length, bool is_masked, bool is_final, unsigned char reserved);
+extern int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, WS_FRAME_TYPE opcode, const void* payload, size_t length, bool is_masked, bool is_final, unsigned char reserved);
 ```
 
 XX**SRS_UWS_FRAME_ENCODER_01_001: [** `uws_frame_encoder_encode` shall encode the information given in `opcode`, `payload`, `length`, `is_masked`, `is_final` and `reserved` according to the RFC6455 into the `encode_buffer` argument.**]**
@@ -30,6 +54,7 @@ XX**SRS_UWS_FRAME_ENCODER_01_047: [** If `BUFFER_enlarge` fails then `uws_frame_
 XX**SRS_UWS_FRAME_ENCODER_01_050: [** The allocated memory shall be accessed by calling `BUFFER_u_char`. **]**
 XX**SRS_UWS_FRAME_ENCODER_01_051: [** If `BUFFER_u_char` fails then `uws_frame_encoder_encode` shall fail and return a non-zero value. **]**
 XX**SRS_UWS_FRAME_ENCODER_01_052: [** If `reserved` has any bits set except the lowest 3 then `uws_frame_encoder_encode` shall fail and return a non-zero value. **]**
+XX**SRS_UWS_FRAME_ENCODER_01_053: [** In order to obtain a 32 bit value for masking, `gb_rand` shall be used 4 times (for each byte). **]**
 
 ### RFC6455 relevant parts
 
@@ -70,30 +95,30 @@ XX**SRS_UWS_FRAME_ENCODER_01_052: [** If `reserved` has any bits set except the 
 
    RSV1, RSV2, RSV3:  1 bit each
 
-      **SRS_UWS_FRAME_ENCODER_01_004: [** MUST be 0 unless an extension is negotiated that defines meanings for non-zero values. **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_004: [** MUST be 0 unless an extension is negotiated that defines meanings for non-zero values. **]**
       If a nonzero value is received and none of the negotiated extensions defines the meaning of such a nonzero value, the receiving endpoint MUST _Fail the WebSocket Connection_.
 
    Opcode:  4 bits
 
       Defines the interpretation of the "Payload data".
-      **SRS_UWS_FRAME_ENCODER_01_006: [** If an unknown opcode is received, the receiving endpoint MUST _Fail the WebSocket Connection_. **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_006: [** If an unknown opcode is received, the receiving endpoint MUST _Fail the WebSocket Connection_. **]**
       The following values are defined.
 
-      **SRS_UWS_FRAME_ENCODER_01_007: [** *  %x0 denotes a continuation frame **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_007: [** *  %x0 denotes a continuation frame **]**
 
-      **SRS_UWS_FRAME_ENCODER_01_008: [** *  %x1 denotes a text frame **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_008: [** *  %x1 denotes a text frame **]**
 
-      **SRS_UWS_FRAME_ENCODER_01_009: [** *  %x2 denotes a binary frame **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_009: [** *  %x2 denotes a binary frame **]**
 
-      **SRS_UWS_FRAME_ENCODER_01_010: [** *  %x3-7 are reserved for further non-control frames **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_010: [** *  %x3-7 are reserved for further non-control frames **]**
 
-      **SRS_UWS_FRAME_ENCODER_01_011: [** *  %x8 denotes a connection close **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_011: [** *  %x8 denotes a connection close **]**
 
-      **SRS_UWS_FRAME_ENCODER_01_012: [** *  %x9 denotes a ping **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_012: [** *  %x9 denotes a ping **]**
 
-      **SRS_UWS_FRAME_ENCODER_01_013: [** *  %xA denotes a pong **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_013: [** *  %xA denotes a pong **]**
 
-      **SRS_UWS_FRAME_ENCODER_01_014: [** *  %xB-F are reserved for further control frames **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_014: [** *  %xB-F are reserved for further control frames **]**
 
    Mask:  1 bit
 

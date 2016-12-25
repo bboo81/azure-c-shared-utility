@@ -69,6 +69,7 @@ static void my_gballoc_free(void* ptr)
 }
 
 #include "azure_c_shared_utility/gballoc.h"
+#include "azure_c_shared_utility/gb_rand.h"
 #include "azure_c_shared_utility/buffer_.h"
 
 #undef ENABLE_MOCKS
@@ -174,7 +175,7 @@ TEST_FUNCTION(uws_frame_encoder_encode_with_NULL_buffer_fails)
     unsigned char test_payload[] = { 0x42 };
 
 	// act
-    result = uws_frame_encoder_encode(NULL, 0x01, test_payload, sizeof(test_payload), false, true, 0);
+    result = uws_frame_encoder_encode(NULL, WS_TEXT_FRAME, test_payload, sizeof(test_payload), false, true, 0);
 
 	// assert
     ASSERT_ARE_NOT_EQUAL(int, 0, result);
@@ -188,6 +189,7 @@ TEST_FUNCTION(uws_frame_encoder_encode_with_NULL_buffer_fails)
 /* Tests_SRS_UWS_FRAME_ENCODER_01_050: [ The allocated memory shall be accessed by calling `BUFFER_u_char`. ]*/
 /* Tests_SRS_UWS_FRAME_ENCODER_01_002: [ Indicates that this is the final fragment in a message. ]*/
 /* Tests_SRS_UWS_FRAME_ENCODER_01_003: [ The first fragment MAY also be the final fragment. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_015: [ Defines whether the "Payload data" is masked. ]*/
 TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_zero_length_binary_frame)
 {
     // arrange
@@ -200,7 +202,7 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_zero_length_binary_frame)
     STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
 
     // act
-    result = uws_frame_encoder_encode(encode_buffer, 0x02, NULL, 0, false, true, 0);
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, NULL, 0, false, true, 0);
 
     // assert
     ASSERT_ARE_EQUAL(int, 0, result);
@@ -224,7 +226,7 @@ TEST_FUNCTION(when_BUFFER_unbuild_fails_then_uws_frame_encoder_encode_fails)
         .SetReturn(1);
 
     // act
-    result = uws_frame_encoder_encode(encode_buffer, 0x02, NULL, 0, false, true, 0);
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, NULL, 0, false, true, 0);
 
     // assert
     ASSERT_ARE_NOT_EQUAL(int, 0, result);
@@ -246,7 +248,7 @@ TEST_FUNCTION(when_BUFFER_enlarge_fails_then_uws_frame_encoder_encode_fails)
         .SetReturn(1);
 
     // act
-    result = uws_frame_encoder_encode(encode_buffer, 0x02, NULL, 0, false, true, 0);
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, NULL, 0, false, true, 0);
 
     // assert
     ASSERT_ARE_NOT_EQUAL(int, 0, result);
@@ -269,7 +271,7 @@ TEST_FUNCTION(when_BUFFER_u_char_fails_then_uws_frame_encoder_encode_fails)
         .SetReturn(NULL);
 
     // act
-    result = uws_frame_encoder_encode(encode_buffer, 0x02, NULL, 0, false, true, 0);
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, NULL, 0, false, true, 0);
 
     // assert
     ASSERT_ARE_NOT_EQUAL(int, 0, result);
@@ -293,7 +295,7 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_zero_length_binary_frame_that_i
     STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
 
     // act
-    result = uws_frame_encoder_encode(encode_buffer, 0x02, NULL, 0, false, false, 0);
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, NULL, 0, false, false, 0);
 
     // assert
     ASSERT_ARE_EQUAL(int, 0, result);
@@ -319,7 +321,7 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_zero_length_binary_frame_with_r
     STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
 
     // act
-    result = uws_frame_encoder_encode(encode_buffer, 0x02, NULL, 0, false, true, 7);
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, NULL, 0, false, true, 7);
 
     // assert
     ASSERT_ARE_EQUAL(int, 0, result);
@@ -340,7 +342,7 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_zero_length_binary_frame_with_r
     BUFFER_HANDLE encode_buffer = real_BUFFER_new();
 
     // act
-    result = uws_frame_encoder_encode(encode_buffer, 0x02, NULL, 0, false, true, 0xFF);
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, NULL, 0, false, true, 0xFF);
 
     // assert
     ASSERT_ARE_NOT_EQUAL(int, 0, result);
@@ -363,7 +365,7 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_zero_length_binary_frame_with_R
     STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
 
     // act
-    result = uws_frame_encoder_encode(encode_buffer, 0x02, NULL, 0, false, true, RESERVED_1);
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, NULL, 0, false, true, RESERVED_1);
 
     // assert
     ASSERT_ARE_EQUAL(int, 0, result);
@@ -389,7 +391,7 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_zero_length_binary_frame_with_R
     STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
 
     // act
-    result = uws_frame_encoder_encode(encode_buffer, 0x02, NULL, 0, false, true, RESERVED_2);
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, NULL, 0, false, true, RESERVED_2);
 
     // assert
     ASSERT_ARE_EQUAL(int, 0, result);
@@ -415,7 +417,476 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_zero_length_binary_frame_with_R
     STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
 
     // act
-    result = uws_frame_encoder_encode(encode_buffer, 0x02, NULL, 0, false, true, RESERVED_3);
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, NULL, 0, false, true, RESERVED_3);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_006: [ If an unknown opcode is received, the receiving endpoint MUST _Fail the WebSocket Connection_. ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_with_opcode_16_fails)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, 0x10, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_007: [ *  %x0 denotes a continuation frame ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_continuation_frame)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x80, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_CONTINUATION_FRAME, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_008: [ *  %x1 denotes a text frame ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_text_frame)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x81, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_TEXT_FRAME, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_009: [ *  %x2 denotes a binary frame ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_binary_frame)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x82, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_010: [ *  %x3-7 are reserved for further non-control frames ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_reserved_non_control_frame_3)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x83, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_RESERVED_NON_CONTROL_FRAME_3, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_010: [ *  %x3-7 are reserved for further non-control frames ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_reserved_non_control_frame_4)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x84, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_RESERVED_NON_CONTROL_FRAME_4, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_010: [ *  %x3-7 are reserved for further non-control frames ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_reserved_non_control_frame_5)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x85, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_RESERVED_NON_CONTROL_FRAME_5, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_010: [ *  %x3-7 are reserved for further non-control frames ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_reserved_non_control_frame_6)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x86, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_RESERVED_NON_CONTROL_FRAME_6, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_010: [ *  %x3-7 are reserved for further non-control frames ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_reserved_non_control_frame_7)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x87, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_RESERVED_NON_CONTROL_FRAME_7, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_011: [ *  %x8 denotes a connection close ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_close_frame)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x88, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_CLOSE_FRAME, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_012: [ *  %x9 denotes a ping ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_ping_frame)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x89, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_PING_FRAME, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_013: [ *  %xA denotes a pong ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_pong_frame)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x8A, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_PONG_FRAME, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_014: [ *  %xB-F are reserved for further control frames ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_reserved_control_frame_B)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x8B, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_RESERVED_CONTROL_FRAME_B, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_014: [ *  %xB-F are reserved for further control frames ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_reserved_control_frame_C)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x8C, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_RESERVED_CONTROL_FRAME_C, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_014: [ *  %xB-F are reserved for further control frames ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_reserved_control_frame_D)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x8D, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_RESERVED_CONTROL_FRAME_D, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_014: [ *  %xB-F are reserved for further control frames ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_reserved_control_frame_E)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x8E, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_RESERVED_CONTROL_FRAME_E, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_014: [ *  %xB-F are reserved for further control frames ]*/
+TEST_FUNCTION(uws_frame_encoder_encodes_a_reserved_control_frame_F)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x8F, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_RESERVED_CONTROL_FRAME_F, NULL, 0, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_015: [ Defines whether the "Payload data" is masked. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_053: [ In order to obtain a 32 bit value for masking, `gb_rand` shall be used 4 times (for each byte). ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_masked_zero_length_binary_frame)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x82, 0x80, 0xFF, 0xFF, 0xFF, 0xFF };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, sizeof(expected_bytes)));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xFF);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xFF);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xFF);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xFF);
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, NULL, 0, true, true, 0);
 
     // assert
     ASSERT_ARE_EQUAL(int, 0, result);
