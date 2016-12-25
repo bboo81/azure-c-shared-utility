@@ -13,6 +13,10 @@ extern "C" {
 
 #include "azure_c_shared_utility/buffer_.h"
 
+#define RESERVED_1  0x04
+#define RESERVED_2  0x02
+#define RESERVED_3  0x01
+
 extern int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, const void* payload, size_t length, bool is_masked, bool is_final, unsigned char reserved);
 
 #ifdef __cplusplus

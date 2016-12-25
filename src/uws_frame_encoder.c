@@ -15,17 +15,16 @@ int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, 
 {
     int result;
 
-    (void)opcode;
-    (void)payload;
-    (void)length;
-    (void)is_masked;
-    (void)is_final;
-    (void)reserved;
-
     if (encode_buffer == NULL)
     {
         /* Codes_SRS_UWS_FRAME_ENCODER_01_045: [ If the argument `encode_buffer` is NULL then `uws_frame_encoder_encode` shall fail and return a non-zero value. ]*/
         LogError("NULL encode_buffer");
+        result = __LINE__;
+    }
+    else if (reserved > 7)
+    {
+        /* Codes_SRS_UWS_FRAME_ENCODER_01_052: [ If `reserved` has any bits set except the lowest 3 then `uws_frame_encoder_encode` shall fail and return a non-zero value. ]*/
+        LogError("Bad reserved value: 0x%02x", reserved);
         result = __LINE__;
     }
     else
@@ -36,6 +35,7 @@ int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, 
         /* Codes_SRS_UWS_FRAME_ENCODER_01_048: [ The buffer `encode_buffer` shall be reset by calling `BUFFER_unbuild`. ]*/
         if (BUFFER_unbuild(encode_buffer) != 0)
         {
+            /* Codes_SRS_UWS_FRAME_ENCODER_01_049: [ If `BUFFER_unbuild` fails then `uws_frame_encoder_encode` shall fail and return a non-zero value. ]*/
             LogError("Cannot reset buffer size for encoded frame");
             result = __LINE__;
         }
@@ -55,9 +55,10 @@ int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, 
             header_bytes = needed_bytes;
             needed_bytes += length;
 
-            /* Codes_SRS_UWS_FRAME_ENCODER_01_046: [ The buffer `encode_buffer` shall be resized accordingly using `BUFFER_resize`. ]*/
+            /* Codes_SRS_UWS_FRAME_ENCODER_01_046: [ The buffer `encode_buffer` shall be resized accordingly using `BUFFER_enlarge`. ]*/
             if (BUFFER_enlarge(encode_buffer, needed_bytes) != 0)
             {
+                /* Codes_SRS_UWS_FRAME_ENCODER_01_047: [ If `BUFFER_enlarge` fails then `uws_frame_encoder_encode` shall fail and return a non-zero value. ]*/
                 LogError("Cannot allocate memory for encoded frame");
                 result = __LINE__;
             }
@@ -65,39 +66,52 @@ int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, 
             {
                 /* Codes_SRS_UWS_FRAME_ENCODER_01_050: [ The allocated memory shall be accessed by calling `BUFFER_u_char`. ]*/
                 unsigned char* buffer = BUFFER_u_char(encode_buffer);
-
-                buffer[0] = opcode;
-
-                if (is_final)
+                if (buffer == NULL)
                 {
-                    buffer[0] |= 0x80;
-                }
-
-                if (length > 65535)
-                {
-
-                }
-                else if (length > 125)
-                {
-
+                    /* Codes_SRS_UWS_FRAME_ENCODER_01_051: [ If `BUFFER_u_char` fails then `uws_frame_encoder_encode` shall fail and return a non-zero value. ]*/
+                    LogError("Cannot get encoded buffer pointer");
+                    result = __LINE__;
                 }
                 else
                 {
-                    buffer[1] = (unsigned char)length;
-                }
+                    buffer[0] = opcode;
 
-                if (is_masked)
-                {
-                    buffer[1] |= 0x80;
-                }
+                    /* Codes_SRS_UWS_FRAME_ENCODER_01_002: [ Indicates that this is the final fragment in a message. ]*/
+                    /* Codes_SRS_UWS_FRAME_ENCODER_01_003: [ The first fragment MAY also be the final fragment. ]*/
+                    if (is_final)
+                    {
+                        buffer[0] |= 0x80;
+                    }
 
-                if (length > 0)
-                {
-                    (void)memcpy(buffer + header_bytes, payload, length);
-                }
+                    /* Codes_SRS_UWS_FRAME_ENCODER_01_004: [ MUST be 0 unless an extension is negotiated that defines meanings for non-zero values. ]*/
+                    buffer[0] |= reserved << 4;
 
-                /* Codes_SRS_UWS_FRAME_ENCODER_01_044: [ On success `uws_frame_encoder_encode` shall return 0. ]*/
-                result = 0;
+                    if (length > 65535)
+                    {
+
+                    }
+                    else if (length > 125)
+                    {
+
+                    }
+                    else
+                    {
+                        buffer[1] = (unsigned char)length;
+                    }
+
+                    if (is_masked)
+                    {
+                        buffer[1] |= 0x80;
+                    }
+
+                    if (length > 0)
+                    {
+                        (void)memcpy(buffer + header_bytes, payload, length);
+                    }
+
+                    /* Codes_SRS_UWS_FRAME_ENCODER_01_044: [ On success `uws_frame_encoder_encode` shall return 0. ]*/
+                    result = 0;
+                }
             }
         }
     }
