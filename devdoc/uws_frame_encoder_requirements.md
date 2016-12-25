@@ -130,16 +130,16 @@ XX**SRS_UWS_FRAME_ENCODER_01_053: [** In order to obtain a 32 bit value for mask
 
       XX**SRS_UWS_FRAME_ENCODER_01_018: [** The length of the "Payload data", in bytes: **]** XX**SRS_UWS_FRAME_ENCODER_01_043: [** if 0-125, that is the payload length. **]**
       XX**SRS_UWS_FRAME_ENCODER_01_019: [** If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length. **]**
-      **SRS_UWS_FRAME_ENCODER_01_020: [** If 127, the following 8 bytes interpreted as a 64-bit unsigned integer (the most significant bit MUST be 0) are the payload length. **]**
-      **SRS_UWS_FRAME_ENCODER_01_021: [** Multibyte length quantities are expressed in network byte order. **]**
-      **SRS_UWS_FRAME_ENCODER_01_022: [** Note that in all cases, the minimal number of bytes MUST be used to encode the length, for example, the length of a 124-byte-long string can't be encoded as the sequence 126, 0, 124. **]**
-      **SRS_UWS_FRAME_ENCODER_01_023: [** The payload length is the length of the "Extension data" + the length of the "Application data". **]**
-      **SRS_UWS_FRAME_ENCODER_01_024: [** The length of the "Extension data" may be zero, in which case the payload length is the length of the "Application data". **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_020: [** If 127, the following 8 bytes interpreted as a 64-bit unsigned integer (the most significant bit MUST be 0) are the payload length. **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_021: [** Multibyte length quantities are expressed in network byte order. **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_022: [** Note that in all cases, the minimal number of bytes MUST be used to encode the length, for example, the length of a 124-byte-long string can't be encoded as the sequence 126, 0, 124. **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_023: [** The payload length is the length of the "Extension data" + the length of the "Application data". **]**
+      The length of the "Extension data" may be zero, in which case the payload length is the length of the "Application data".
 
    Masking-key:  0 or 4 bytes
 
-      **SRS_UWS_FRAME_ENCODER_01_025: [** All frames sent from the client to the server are masked by a 32-bit value that is contained within the frame. **]**
-      **SRS_UWS_FRAME_ENCODER_01_026: [** This field is present if the mask bit is set to 1 and is absent if the mask bit is set to 0. **]**
+      All frames sent from the client to the server are masked by a 32-bit value that is contained within the frame.
+      XX**SRS_UWS_FRAME_ENCODER_01_026: [** This field is present if the mask bit is set to 1 and is absent if the mask bit is set to 0. **]**
       See Section 5.3 for further information on client-to-server masking.
 
    Payload data:  (x+y) bytes
@@ -148,14 +148,14 @@ XX**SRS_UWS_FRAME_ENCODER_01_053: [** In order to obtain a 32 bit value for mask
 
    Extension data:  x bytes
 
-      **SRS_UWS_FRAME_ENCODER_01_028: [** The "Extension data" is 0 bytes unless an extension has been negotiated. **]**
-      **SRS_UWS_FRAME_ENCODER_01_029: [** Any extension MUST specify the length of the "Extension data", or how that length may be calculated, and how the extension use MUST be negotiated during the opening handshake. **]**
-      **SRS_UWS_FRAME_ENCODER_01_030: [** If present, the "Extension data" is included in the total payload length. **]**
+      The "Extension data" is 0 bytes unless an extension has been negotiated.
+      Any extension MUST specify the length of the "Extension data", or how that length may be calculated, and how the extension use MUST be negotiated during the opening handshake.
+      If present, the "Extension data" is included in the total payload length.
 
    Application data:  y bytes
 
-      **SRS_UWS_FRAME_ENCODER_01_031: [** Arbitrary "Application data", taking up the remainder of the frame after any "Extension data". **]**
-      **SRS_UWS_FRAME_ENCODER_01_032: [** The length of the "Application data" is equal to the payload length minus the length of the "Extension data". **]**
+      Arbitrary "Application data", taking up the remainder of the frame after any "Extension data".
+      The length of the "Application data" is equal to the payload length minus the length of the "Extension data".
 
    The base framing protocol is formally defined by the following ABNF [RFC5234].
    It is important to note that the representation of this data is binary, not ASCII characters.
@@ -257,25 +257,25 @@ XX**SRS_UWS_FRAME_ENCODER_01_053: [** In order to obtain a 32 bit value for mask
 
 5.3.  Client-to-Server Masking
 
-   **SRS_UWS_FRAME_ENCODER_01_033: [** A masked frame MUST have the field frame-masked set to 1, as defined in Section 5.2. **]**
+   XX**SRS_UWS_FRAME_ENCODER_01_033: [** A masked frame MUST have the field frame-masked set to 1, as defined in Section 5.2. **]**
 
-   **SRS_UWS_FRAME_ENCODER_01_034: [** The masking key is contained completely within the frame, as defined in Section 5.2 as frame-masking-key. **]**
-   **SRS_UWS_FRAME_ENCODER_01_035: [** It is used to mask the "Payload data" defined in the same section as frame-payload-data, which includes "Extension data" and "Application data". **]**
+   XX**SRS_UWS_FRAME_ENCODER_01_034: [** The masking key is contained completely within the frame, as defined in Section 5.2 as frame-masking-key. **]**
+   XX**SRS_UWS_FRAME_ENCODER_01_035: [** It is used to mask the "Payload data" defined in the same section as frame-payload-data, which includes "Extension data" and "Application data". **]**
 
-   **SRS_UWS_FRAME_ENCODER_01_036: [** The masking key is a 32-bit value chosen at random by the client. **]**
-   **SRS_UWS_FRAME_ENCODER_01_037: [** When preparing a masked frame, the client MUST pick a fresh masking key from the set of allowed 32-bit values. **]**
-   **SRS_UWS_FRAME_ENCODER_01_038: [** The masking key needs to be unpredictable; thus, the masking key MUST be derived from a strong source of entropy, and the masking key for a given frame MUST NOT make it simple for a server/proxy to predict the masking key for a subsequent frame. **]**
+   XX**SRS_UWS_FRAME_ENCODER_01_036: [** The masking key is a 32-bit value chosen at random by the client. **]**
+   XX**SRS_UWS_FRAME_ENCODER_01_037: [** When preparing a masked frame, the client MUST pick a fresh masking key from the set of allowed 32-bit values. **]**
+   XX**SRS_UWS_FRAME_ENCODER_01_038: [** The masking key needs to be unpredictable; thus, the masking key MUST be derived from a strong source of entropy, and the masking key for a given frame MUST NOT make it simple for a server/proxy to predict the masking key for a subsequent frame. **]**
    The unpredictability of the masking key is essential to prevent authors of malicious applications from selecting the bytes that appear on the wire.
    RFC 4086 [RFC4086] discusses what entails a suitable source of entropy for security-sensitive applications.
 
    The masking does not affect the length of the "Payload data".
-   **SRS_UWS_FRAME_ENCODER_01_039: [** To convert masked data into unmasked data, or vice versa, the following algorithm is applied. **]**
-   **SRS_UWS_FRAME_ENCODER_01_040: [** The same algorithm applies regardless of the direction of the translation, e.g., the same steps are applied to mask the data as to unmask the data. **]**
+   XX**SRS_UWS_FRAME_ENCODER_01_039: [** To convert masked data into unmasked data, or vice versa, the following algorithm is applied. **]**
+   XX**SRS_UWS_FRAME_ENCODER_01_040: [** The same algorithm applies regardless of the direction of the translation, e.g., the same steps are applied to mask the data as to unmask the data. **]**
 
-   **SRS_UWS_FRAME_ENCODER_01_041: [** Octet i of the transformed data ("transformed-octet-i") is the XOR of octet i of the original data ("original-octet-i") with octet at index i modulo 4 of the masking key ("masking-key-octet-j"): **]**
+   XX**SRS_UWS_FRAME_ENCODER_01_041: [** Octet i of the transformed data ("transformed-octet-i") is the XOR of octet i of the original data ("original-octet-i") with octet at index i modulo 4 of the masking key ("masking-key-octet-j"): **]**
 
      j                   = i MOD 4
      transformed-octet-i = original-octet-i XOR masking-key-octet-j
 
-   **SRS_UWS_FRAME_ENCODER_01_042: [** The payload length, indicated in the framing as frame-payload-length, does NOT include the length of the masking key. **]**
+   XX**SRS_UWS_FRAME_ENCODER_01_042: [** The payload length, indicated in the framing as frame-payload-length, does NOT include the length of the masking key. **]**
    It is the length of the "Payload data", e.g., the number of bytes following the masking key.

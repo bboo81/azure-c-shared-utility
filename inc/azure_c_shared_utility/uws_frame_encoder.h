@@ -6,12 +6,15 @@
 
 #ifdef __cplusplus
 #include <cstdbool>
+#include <cstddef>
 extern "C" {
 #else
 #include <stdbool.h>
+#include <stddef.h>
 #endif
 
 #include "azure_c_shared_utility/buffer_.h"
+#include "azure_c_shared_utility/umock_c_prod.h"
 
 #define RESERVED_1  0x04
 #define RESERVED_2  0x02
@@ -37,7 +40,7 @@ extern "C" {
 
 DEFINE_ENUM(WS_FRAME_TYPE, WS_FRAME_TYPE_VALUES);
 
-extern int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, unsigned char opcode, const void* payload, size_t length, bool is_masked, bool is_final, unsigned char reserved);
+MOCKABLE_FUNCTION(, int, uws_frame_encoder_encode, BUFFER_HANDLE, encode_buffer, unsigned char, opcode, const void*, payload, size_t, length, bool, is_masked, bool, is_final, unsigned char, reserved);
 
 #ifdef __cplusplus
 }

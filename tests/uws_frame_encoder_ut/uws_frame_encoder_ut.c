@@ -182,6 +182,24 @@ TEST_FUNCTION(uws_frame_encoder_encode_with_NULL_buffer_fails)
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 }
 
+/* Tests_SRS_UWS_FRAME_ENCODER_01_054: [ If `length` is greater than 0 and payload is NULL, then `uws_frame_encoder_encode` shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_with_1_length_and_NULL_payload_fails)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, NULL, 1, false, true, 0);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
 /* Tests_SRS_UWS_FRAME_ENCODER_01_001: [ `uws_frame_encoder_encode` shall encode the information given in `opcode`, `payload`, `length`, `is_masked`, `is_final` and `reserved` according to the RFC6455 into the `encode_buffer` argument.]*/
 /* Tests_SRS_UWS_FRAME_ENCODER_01_044: [ On success `uws_frame_encoder_encode` shall return 0. ]*/
 /* Tests_SRS_UWS_FRAME_ENCODER_01_048: [ The buffer `encode_buffer` shall be reset by calling `BUFFER_unbuild`. ]*/
@@ -869,6 +887,8 @@ TEST_FUNCTION(uws_frame_encoder_encodes_a_reserved_control_frame_F)
 /* Tests_SRS_UWS_FRAME_ENCODER_01_015: [ Defines whether the "Payload data" is masked. ]*/
 /* Tests_SRS_UWS_FRAME_ENCODER_01_053: [ In order to obtain a 32 bit value for masking, `gb_rand` shall be used 4 times (for each byte). ]*/
 /* Tests_SRS_UWS_FRAME_ENCODER_01_016: [ If set to 1, a masking key is present in masking-key, and this is used to unmask the "Payload data" as per Section 5.3. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_026: [ This field is present if the mask bit is set to 1 and is absent if the mask bit is set to 0. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_042: [ The payload length, indicated in the framing as frame-payload-length, does NOT include the length of the masking key. ]*/
 TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_masked_zero_length_binary_frame)
 {
     // arrange
@@ -905,6 +925,8 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_masked_zero_length_binary_frame
 /* Tests_SRS_UWS_FRAME_ENCODER_01_015: [ Defines whether the "Payload data" is masked. ]*/
 /* Tests_SRS_UWS_FRAME_ENCODER_01_053: [ In order to obtain a 32 bit value for masking, `gb_rand` shall be used 4 times (for each byte). ]*/
 /* Tests_SRS_UWS_FRAME_ENCODER_01_016: [ If set to 1, a masking key is present in masking-key, and this is used to unmask the "Payload data" as per Section 5.3. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_026: [ This field is present if the mask bit is set to 1 and is absent if the mask bit is set to 0. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_042: [ The payload length, indicated in the framing as frame-payload-length, does NOT include the length of the masking key. ]*/
 TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_masked_zero_length_binary_frame_different_mask)
 {
     // arrange
@@ -939,6 +961,7 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_masked_zero_length_binary_frame
 }
 
 /* Tests_SRS_UWS_FRAME_ENCODER_01_043: [ if 0-125, that is the payload length. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_023: [ The payload length is the length of the "Extension data" + the length of the "Application data". ]*/
 TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_1_byte_long_binary_frame)
 {
     // arrange
@@ -966,6 +989,8 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_1_byte_long_binary_frame)
 }
 
 /* Tests_SRS_UWS_FRAME_ENCODER_01_043: [ if 0-125, that is the payload length. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_022: [ Note that in all cases, the minimal number of bytes MUST be used to encode the length, for example, the length of a 124-byte-long string can't be encoded as the sequence 126, 0, 124. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_023: [ The payload length is the length of the "Extension data" + the length of the "Application data". ]*/
 TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_125_byte_long_binary_frame)
 {
     // arrange
@@ -1011,6 +1036,7 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_125_byte_long_binary_frame)
 }
 
 /* Tests_SRS_UWS_FRAME_ENCODER_01_019: [ If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_023: [ The payload length is the length of the "Extension data" + the length of the "Application data". ]*/
 TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_126_byte_long_binary_frame)
 {
     // arrange
@@ -1058,6 +1084,9 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_126_byte_long_binary_frame)
 }
 
 /* Tests_SRS_UWS_FRAME_ENCODER_01_019: [ If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_021: [ Multibyte length quantities are expressed in network byte order. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_022: [ Note that in all cases, the minimal number of bytes MUST be used to encode the length, for example, the length of a 124-byte-long string can't be encoded as the sequence 126, 0, 124. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_023: [ The payload length is the length of the "Extension data" + the length of the "Application data". ]*/
 TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_65535_byte_long_binary_frame)
 {
     // arrange
@@ -1089,12 +1118,278 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_65535_byte_long_binary_frame)
 
     // assert
     ASSERT_ARE_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(size_t, 65535 + 4, real_BUFFER_length(encode_buffer));
     ASSERT_ARE_EQUAL_WITH_MSG(int, 0, memcmp(expected_bytes, real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer)), "Memory compare failed");
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 
     // cleanup
     free(expected_bytes);
     free(payload);
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_020: [ If 127, the following 8 bytes interpreted as a 64-bit unsigned integer (the most significant bit MUST be 0) are the payload length. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_021: [ Multibyte length quantities are expressed in network byte order. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_023: [ The payload length is the length of the "Extension data" + the length of the "Application data". ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_65536_byte_long_binary_frame)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char* payload = (unsigned char*)malloc(65536);
+    unsigned char* expected_bytes = (unsigned char*)malloc(65536 + 10);
+    uint32_t i;
+
+    expected_bytes[0] = 0x82;
+    expected_bytes[1] = 0x7F;
+    expected_bytes[2] = 0x00;
+    expected_bytes[3] = 0x00;
+    expected_bytes[4] = 0x00;
+    expected_bytes[5] = 0x00;
+    expected_bytes[6] = 0x00;
+    expected_bytes[7] = 0x01;
+    expected_bytes[8] = 0x00;
+    expected_bytes[9] = 0x00;
+
+    for (i = 0; i < 65535; i++)
+    {
+        payload[i] = (unsigned char)i;
+        expected_bytes[i + 10] = (unsigned char)i;
+    }
+
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 65536 + 10));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, payload, 65536, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(size_t, 65536 + 10, real_BUFFER_length(encode_buffer));
+    ASSERT_ARE_EQUAL_WITH_MSG(int, 0, memcmp(expected_bytes, real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer)), "Memory compare failed");
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    free(expected_bytes);
+    free(payload);
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_033: [ A masked frame MUST have the field frame-masked set to 1, as defined in Section 5.2. **]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_034: [ The masking key is contained completely within the frame, as defined in Section 5.2 as frame-masking-key. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_035: [ It is used to mask the "Payload data" defined in the same section as frame-payload-data, which includes "Extension data" and "Application data". ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_036: [ The masking key is a 32-bit value chosen at random by the client. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_037: [ When preparing a masked frame, the client MUST pick a fresh masking key from the set of allowed 32-bit values. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_038: [ The masking key needs to be unpredictable; thus, the masking key MUST be derived from a strong source of entropy, and the masking key for a given frame MUST NOT make it simple for a server/proxy to predict the masking key for a subsequent frame. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_039: [ To convert masked data into unmasked data, or vice versa, the following algorithm is applied. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_040: [ The same algorithm applies regardless of the direction of the translation, e.g., the same steps are applied to mask the data as to unmask the data. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_041: [ Octet i of the transformed data ("transformed-octet-i") is the XOR of octet i of the original data ("original-octet-i") with octet at index i modulo 4 of the masking key ("masking-key-octet-j"): ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_masks_a_1_byte_frame_with_0_as_mask)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char payload[] = { 0x42 };
+    unsigned char expected_bytes[] = { 0x82, 0x81, 0x00, 0x00, 0x00, 0x00, 0x42 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, sizeof(expected_bytes)));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0x00);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0x00);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0x00);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0x00);
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, payload, sizeof(payload), true, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_033: [ A masked frame MUST have the field frame-masked set to 1, as defined in Section 5.2. **]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_034: [ The masking key is contained completely within the frame, as defined in Section 5.2 as frame-masking-key. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_035: [ It is used to mask the "Payload data" defined in the same section as frame-payload-data, which includes "Extension data" and "Application data". ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_036: [ The masking key is a 32-bit value chosen at random by the client. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_037: [ When preparing a masked frame, the client MUST pick a fresh masking key from the set of allowed 32-bit values. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_038: [ The masking key needs to be unpredictable; thus, the masking key MUST be derived from a strong source of entropy, and the masking key for a given frame MUST NOT make it simple for a server/proxy to predict the masking key for a subsequent frame. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_039: [ To convert masked data into unmasked data, or vice versa, the following algorithm is applied. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_040: [ The same algorithm applies regardless of the direction of the translation, e.g., the same steps are applied to mask the data as to unmask the data. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_041: [ Octet i of the transformed data ("transformed-octet-i") is the XOR of octet i of the original data ("original-octet-i") with octet at index i modulo 4 of the masking key ("masking-key-octet-j"): ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_masks_a_1_byte_frame_with_0xFF_as_mask)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char payload[] = { 0x42 };
+    unsigned char expected_bytes[] = { 0x82, 0x81, 0xFF, 0x00, 0x00, 0x00, 0xBD };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, sizeof(expected_bytes)));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xFF);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0x00);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0x00);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0x00);
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, payload, sizeof(payload), true, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_033: [ A masked frame MUST have the field frame-masked set to 1, as defined in Section 5.2. **]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_034: [ The masking key is contained completely within the frame, as defined in Section 5.2 as frame-masking-key. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_035: [ It is used to mask the "Payload data" defined in the same section as frame-payload-data, which includes "Extension data" and "Application data". ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_036: [ The masking key is a 32-bit value chosen at random by the client. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_037: [ When preparing a masked frame, the client MUST pick a fresh masking key from the set of allowed 32-bit values. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_038: [ The masking key needs to be unpredictable; thus, the masking key MUST be derived from a strong source of entropy, and the masking key for a given frame MUST NOT make it simple for a server/proxy to predict the masking key for a subsequent frame. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_039: [ To convert masked data into unmasked data, or vice versa, the following algorithm is applied. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_040: [ The same algorithm applies regardless of the direction of the translation, e.g., the same steps are applied to mask the data as to unmask the data. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_041: [ Octet i of the transformed data ("transformed-octet-i") is the XOR of octet i of the original data ("original-octet-i") with octet at index i modulo 4 of the masking key ("masking-key-octet-j"): ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_masks_a_4_byte_frame_with_0xFF_as_mask)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char payload[] = { 0x42, 0x43, 0x44, 0x45 };
+    unsigned char expected_bytes[] = { 0x82, 0x84, 0xFF, 0xFF, 0xFF, 0xFF, 0xBD, 0xBC, 0xBB, 0xBA };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, sizeof(expected_bytes)));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xFF);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xFF);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xFF);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xFF);
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, payload, sizeof(payload), true, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_033: [ A masked frame MUST have the field frame-masked set to 1, as defined in Section 5.2. **]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_034: [ The masking key is contained completely within the frame, as defined in Section 5.2 as frame-masking-key. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_035: [ It is used to mask the "Payload data" defined in the same section as frame-payload-data, which includes "Extension data" and "Application data". ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_036: [ The masking key is a 32-bit value chosen at random by the client. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_037: [ When preparing a masked frame, the client MUST pick a fresh masking key from the set of allowed 32-bit values. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_038: [ The masking key needs to be unpredictable; thus, the masking key MUST be derived from a strong source of entropy, and the masking key for a given frame MUST NOT make it simple for a server/proxy to predict the masking key for a subsequent frame. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_039: [ To convert masked data into unmasked data, or vice versa, the following algorithm is applied. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_040: [ The same algorithm applies regardless of the direction of the translation, e.g., the same steps are applied to mask the data as to unmask the data. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_041: [ Octet i of the transformed data ("transformed-octet-i") is the XOR of octet i of the original data ("original-octet-i") with octet at index i modulo 4 of the masking key ("masking-key-octet-j"): ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_masks_a_5_byte_frame_with_0xFF_as_mask)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char payload[] = { 0x42, 0x43, 0x44, 0x45, 0x01 };
+    unsigned char expected_bytes[] = { 0x82, 0x85, 0xFF, 0xFF, 0xFF, 0xFF, 0xBD, 0xBC, 0xBB, 0xBA, 0xFE };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, sizeof(expected_bytes)));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xFF);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xFF);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xFF);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xFF);
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, payload, sizeof(payload), true, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_033: [ A masked frame MUST have the field frame-masked set to 1, as defined in Section 5.2. **]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_034: [ The masking key is contained completely within the frame, as defined in Section 5.2 as frame-masking-key. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_035: [ It is used to mask the "Payload data" defined in the same section as frame-payload-data, which includes "Extension data" and "Application data". ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_036: [ The masking key is a 32-bit value chosen at random by the client. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_037: [ When preparing a masked frame, the client MUST pick a fresh masking key from the set of allowed 32-bit values. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_038: [ The masking key needs to be unpredictable; thus, the masking key MUST be derived from a strong source of entropy, and the masking key for a given frame MUST NOT make it simple for a server/proxy to predict the masking key for a subsequent frame. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_039: [ To convert masked data into unmasked data, or vice versa, the following algorithm is applied. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_040: [ The same algorithm applies regardless of the direction of the translation, e.g., the same steps are applied to mask the data as to unmask the data. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_041: [ Octet i of the transformed data ("transformed-octet-i") is the XOR of octet i of the original data ("original-octet-i") with octet at index i modulo 4 of the masking key ("masking-key-octet-j"): ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_masks_a_8_byte_frame_with_different_mask_bytes)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char payload[] = { 0x42, 0x43, 0x44, 0x45, 0x01, 0x02, 0xFF, 0xAA };
+    unsigned char expected_bytes[] = { 0x82, 0x88, 0x00, 0xFF, 0xAA, 0x42, 0x42, 0xBC, 0xEE, 0x07, 0x01, 0xFD, 0x55, 0xE8 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, sizeof(expected_bytes)));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0x00);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xFF);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0xAA);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0x42);
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, payload, sizeof(payload), true, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
     real_BUFFER_delete(encode_buffer);
 }
 
