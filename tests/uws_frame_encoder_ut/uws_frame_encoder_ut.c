@@ -132,6 +132,8 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_GLOBAL_MOCK_HOOK(gballoc_free, my_gballoc_free);
     REGISTER_GLOBAL_MOCK_HOOK(BUFFER_u_char, real_BUFFER_u_char);
     REGISTER_GLOBAL_MOCK_HOOK(BUFFER_enlarge, real_BUFFER_enlarge);
+
+    REGISTER_UMOCK_ALIAS_TYPE(BUFFER_HANDLE, void*);
 }
 
 TEST_SUITE_CLEANUP(suite_cleanup)
@@ -181,13 +183,19 @@ TEST_FUNCTION(uws_frame_encoder_encode_with_NULL_buffer_fails)
 
 /* Tests_SRS_UWS_FRAME_ENCODER_01_001: [ `uws_frame_encoder_encode` shall encode the information given in `opcode`, `payload`, `length`, `is_masked`, `is_final` and `reserved` according to the RFC6455 into the `encode_buffer` argument.]*/
 /* Tests_SRS_UWS_FRAME_ENCODER_01_044: [ On success `uws_frame_encoder_encode` shall return 0. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_048: [ The buffer `encode_buffer` shall be reset by calling `BUFFER_unbuild`. ]*/
 /* Tests_SRS_UWS_FRAME_ENCODER_01_046: [ The buffer `encode_buffer` shall be resized accordingly using `BUFFER_resize`. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_050: [ The allocated memory shall be accessed by calling `BUFFER_u_char`. ]*/
 TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_zero_length_binary_frame)
 {
     // arrange
     int result;
     BUFFER_HANDLE encode_buffer = real_BUFFER_new();
     unsigned char expected_bytes[] = { 0x82, 0x00 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
 
     // act
     result = uws_frame_encoder_encode(encode_buffer, 0x02, NULL, 0, false, true, 0);
