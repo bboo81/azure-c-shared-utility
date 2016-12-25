@@ -1,6 +1,14 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+#ifdef __cplusplus
+#include <cstddef>
+extern "C"
+{
+#else
+#include <stddef.h>
+#endif
+
 #include "testrunnerswitcher.h"
 #include "umock_c.h"
 
@@ -72,24 +80,14 @@ extern void real_BUFFER_delete(BUFFER_HANDLE handle);
 extern int real_BUFFER_enlarge(BUFFER_HANDLE handle, size_t enlargeSize);
 extern int real_BUFFER_size(BUFFER_HANDLE handle, size_t* size);
 extern int real_BUFFER_content(BUFFER_HANDLE handle, const unsigned char** content);
-
-int my_BUFFER_enlarge(BUFFER_HANDLE handle, size_t enlargeSize)
-{
-    return real_BUFFER_enlarge(handle, enlargeSize);
-}
-
-int my_BUFFER_size(BUFFER_HANDLE handle, size_t* size)
-{
-    return real_BUFFER_size(handle, size);
-}
-
-int my_BUFFER_content(BUFFER_HANDLE handle, const unsigned char** content)
-{
-    return real_BUFFER_content(handle, content);
-}
+extern unsigned char* real_BUFFER_u_char(BUFFER_HANDLE handle);
+extern size_t real_BUFFER_length(BUFFER_HANDLE handle);
 
 static TEST_MUTEX_HANDLE g_testByTest;
 static TEST_MUTEX_HANDLE g_dllByDll;
+
+static char expected_encoded_str[256];
+static char actual_encoded_str[256];
 
 DEFINE_ENUM_STRINGS(UMOCK_C_ERROR_CODE, UMOCK_C_ERROR_CODE_VALUES)
 
@@ -98,6 +96,25 @@ static void on_umock_c_error(UMOCK_C_ERROR_CODE error_code)
     char temp_str[256];
     (void)snprintf(temp_str, sizeof(temp_str), "umock_c reported error :%s", ENUM_TO_STRING(UMOCK_C_ERROR_CODE, error_code));
     ASSERT_FAIL(temp_str);
+}
+
+static void stringify_bytes(const unsigned char* bytes, size_t byte_count, char* output_string)
+{
+    size_t i;
+    size_t pos = 0;
+
+    output_string[pos++] = '[';
+    for (i = 0; i < byte_count; i++)
+    {
+        (void)sprintf(&output_string[pos], "0x%02X", bytes[i]);
+        if (i < byte_count - 1)
+        {
+            strcat(output_string, ",");
+        }
+        pos = strlen(output_string);
+    }
+    output_string[pos++] = ']';
+    output_string[pos++] = '\0';
 }
 
 BEGIN_TEST_SUITE(uws_frame_encoder_ut)
@@ -113,6 +130,8 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_GLOBAL_MOCK_HOOK(gballoc_malloc, my_gballoc_malloc);
     REGISTER_GLOBAL_MOCK_HOOK(gballoc_realloc, my_gballoc_realloc);
     REGISTER_GLOBAL_MOCK_HOOK(gballoc_free, my_gballoc_free);
+    REGISTER_GLOBAL_MOCK_HOOK(BUFFER_u_char, real_BUFFER_u_char);
+    REGISTER_GLOBAL_MOCK_HOOK(BUFFER_enlarge, real_BUFFER_enlarge);
 }
 
 TEST_SUITE_CLEANUP(suite_cleanup)
@@ -168,12 +187,16 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_zero_length_binary_frame)
     // arrange
     int result;
     BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x82, 0x00 };
 
     // act
     result = uws_frame_encoder_encode(encode_buffer, 0x02, NULL, 0, false, true, 0);
 
     // assert
     ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 
     // cleanup
