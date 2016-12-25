@@ -3179,4 +3179,85 @@ TEST_FUNCTION(uws_send_frame_with_NULL_buffer_and_non_zero_size_fails)
     uws_destroy(uws);
 }
 
+/* Tests_SRS_UWS_01_043: [ If the uws instance is not OPEN (open has not been called or is still in progress) then `uws_send_frame` shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(uws_send_frame_when_not_open_fails)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    int result;
+    unsigned char test_payload[] = { 0x42 };
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    umock_c_reset_all_calls();
+
+    // act
+    result = uws_send_frame(uws, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4248);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_043: [ If the uws instance is not OPEN (open has not been called or is still in progress) then `uws_send_frame` shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(uws_send_frame_when_opening_underlying_io_fails)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    int result;
+    unsigned char test_payload[] = { 0x42 };
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    umock_c_reset_all_calls();
+
+    // act
+    result = uws_send_frame(uws, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4248);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_043: [ If the uws instance is not OPEN (open has not been called or is still in progress) then `uws_send_frame` shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(uws_send_frame_when_waiting_for_upgrade_response_fails)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    int result;
+    unsigned char test_payload[] = { 0x42 };
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    umock_c_reset_all_calls();
+
+    // act
+    result = uws_send_frame(uws, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4248);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
 END_TEST_SUITE(uws_ut)

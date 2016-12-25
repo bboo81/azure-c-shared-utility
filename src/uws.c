@@ -864,6 +864,12 @@ int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, boo
         LogError("NULL buffer with %u size.", (unsigned int)size);
         result = __LINE__;
     }
+    else if (uws->uws_state != UWS_STATE_OPEN)
+    {
+        /* Codes_SRS_UWS_01_043: [ If the uws instance is not OPEN (open has not been called or is still in progress) then `uws_send_frame` shall fail and return a non-zero value. ]*/
+        LogError("uws not in OPEN state.");
+        result = __LINE__;
+    }
     else
     {
         result = 0;

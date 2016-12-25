@@ -149,7 +149,7 @@ extern int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t si
 **SRS_UWS_01_040: [** - the send complete callback `on_ws_send_frame_complete` **]**
 **SRS_UWS_01_041: [** - the send complete callback context `on_send_complete_context` **]**
 **SRS_UWS_01_042: [** On success, `uws_send_frame` shall return 0. **]**
-**SRS_UWS_01_043: [** If the uws instance is not OPEN (open has not been called or is still in progress) then `uws_send_frame` shall fail and return a non-zero value. **]**
+XX**SRS_UWS_01_043: [** If the uws instance is not OPEN (open has not been called or is still in progress) then `uws_send_frame` shall fail and return a non-zero value. **]**
 XX**SRS_UWS_01_044: [** If the argument `uws` is NULL, `uws_send_frame` shall fail and return a non-zero value. **]**
 XX**SRS_UWS_01_045: [** If `size` is non-zero and `buffer` is NULL then `uws_send_frame` shall fail and return a non-zero value. **]**
 **SRS_UWS_01_046: [** `uws_send_frame` shall allocate enough memory to hold the websocket frame that contains `size` bytes. **]**
