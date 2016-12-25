@@ -48,7 +48,7 @@ extern UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char
 extern void uws_destroy(UWS_HANDLE uws);
 extern int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_ws_open_complete_context, ON_WS_FRAME_RECEIVED on_ws_frame_received, void* on_ws_frame_received_context, ON_WS_ERROR on_ws_error, void* on_ws_error_context);
 extern int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* on_ws_close_complete_context);
-extern int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* callback_context);
+extern int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, bool is_final, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* callback_context);
 extern void uws_dowork(UWS_HANDLE uws);
 ```
 
@@ -96,7 +96,7 @@ extern void uws_destroy(UWS_HANDLE uws);
 
 XX**SRS_UWS_01_019: [** `uws_destroy` shall free all resources associated with the uws instance. **]**
 XX**SRS_UWS_01_020: [** If `uws` is NULL, `uws_destroy` shall do nothing. **]** 
-**SRS_UWS_01_424: [** `uws_destroy` shall free the buffer allocated in `uws_create` by calling `BUFFER_delete`. **]**
+XX**SRS_UWS_01_424: [** `uws_destroy` shall free the buffer allocated in `uws_create` by calling `BUFFER_delete`. **]**
 **SRS_UWS_01_021: [** `uws_destroy` shall perform a close action if the uws instance has already been open. **]**
 **SRS_UWS_01_022: [** `uws_destroy` shall execute a close action if an open is in progress. **]**
 XX**SRS_UWS_01_023: [** `uws_destroy` shall destroy the underlying IO created in `uws_create` by calling `xio_destroy`. **]**
@@ -141,7 +141,7 @@ XX**SRS_UWS_01_033: [** `uws_close` after a `uws_close` shall fail and return a 
 ### uws_send_frame
 
 ```c
-extern int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* callback_context);
+extern int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, bool is_final, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* callback_context);
 ```
 
 **SRS_UWS_01_038: [** `uws_send_frame` shall create and queue a structure that contains: **]**
@@ -150,13 +150,13 @@ extern int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t si
 **SRS_UWS_01_041: [** - the send complete callback context `on_send_complete_context` **]**
 **SRS_UWS_01_042: [** On success, `uws_send_frame` shall return 0. **]**
 **SRS_UWS_01_043: [** If the uws instance is not OPEN (open has not been called or is still in progress) then `uws_send_frame` shall fail and return a non-zero value. **]**
-**SRS_UWS_01_044: [** If any of the arguments `uws` or `buffer` are NULL, `uws_send_frame` shall fail and return a non-zero value. **]**
+**SRS_UWS_01_044: [** If the argument `uws` is NULL, `uws_send_frame` shall fail and return a non-zero value. **]**
 **SRS_UWS_01_045: [** If `size` is zero then `uws_send_frame` shall fail and return a non-zero value. **]**
 **SRS_UWS_01_046: [** `uws_send_frame` shall allocate enough memory to hold the websocket frame that contains `size` bytes. **]**
 **SRS_UWS_01_047: [** If allocating memory for the newly queued item fails, `uws_send_frame` shall fail and return a non-zero value. **]**
 **SRS_UWS_01_048: [** Queueing shall be done by calling `singlylinkedlist_add`. **]**
 **SRS_UWS_01_049: [** If `singlylinkedlist_add` fails, `uws_send_frame` shall fail and return a non-zero value. **]**
-**SRS_UWS_01_050: [** The argument on_ws_send_frame_complete shall be optional, if NULL is passed by the caller then no send complete callback shall be triggered. **]**
+**SRS_UWS_01_050: [** The argument `on_ws_send_frame_complete` shall be optional, if NULL is passed by the caller then no send complete callback shall be triggered. **]**
 
 ### uws_dowork
 
@@ -719,7 +719,7 @@ XX**SRS_UWS_01_419: [** If there is an error decoding the WebSocket frame, an er
    [RFC5234] does not specify a character encoding: "Rules resolve into a string of terminal values, sometimes called characters. In ABNF, a character is merely a non-negative integer. In certain contexts, a specific mapping (encoding) of values into a character set (such as ASCII) will be specified."
    Here, the specified encoding is a binary encoding where each terminal value is encoded in the specified number of bits, which varies for each field.
 
-**SRS_UWS_01_179: [**     ws-frame                = frame-fin           ; 1 bit in length
+   ws-frame                = frame-fin           ; 1 bit in length
                               frame-rsv1          ; 1 bit in length
                               frame-rsv2          ; 1 bit in length
                               frame-rsv3          ; 1 bit in length
@@ -731,108 +731,108 @@ XX**SRS_UWS_01_419: [** If there is an error decoding the WebSocket frame, an er
                               [ frame-masking-key ]  ; 32 bits in length
                               frame-payload-data     ; n*8 bits in
                                                      ; length, where
-                                                     ; n >= 0 **]**
+                                                     ; n >= 0
 
-    **SRS_UWS_01_180: [** frame-fin               = %x0 ; more frames of this message follow **]**
-                            **SRS_UWS_01_181: [** / %x1 ; final frame of this message **]**
+    frame-fin               = %x0 ; more frames of this message follow
+                            / %x1 ; final frame of this message
                                   ; 1 bit in length
 
-    **SRS_UWS_01_182: [** frame-rsv1              = %x0 / %x1
+    frame-rsv1              = %x0 / %x1
                               ; 1 bit in length, MUST be 0 unless
-                              ; negotiated otherwise **]**
+                              ; negotiated otherwise
 
-    **SRS_UWS_01_183: [** frame-rsv2              = %x0 / %x1
+    frame-rsv2              = %x0 / %x1
                               ; 1 bit in length, MUST be 0 unless
-                              ; negotiated otherwise **]**
+                              ; negotiated otherwise
 
-    **SRS_UWS_01_184: [** frame-rsv3              = %x0 / %x1
+    frame-rsv3              = %x0 / %x1
                               ; 1 bit in length, MUST be 0 unless
-                              ; negotiated otherwise **]**
+                              ; negotiated otherwise
 
-    **SRS_UWS_01_185: [** frame-opcode            = frame-opcode-non-control /
+    frame-opcode            = frame-opcode-non-control /
                               frame-opcode-control /
-                              frame-opcode-cont **]**
+                              frame-opcode-cont
 
-    **SRS_UWS_01_186: [** frame-opcode-cont       = %x0 ; frame continuation **]**
+    frame-opcode-cont       = %x0 ; frame continuation
 
-    **SRS_UWS_01_187: [** frame-opcode-non-control= %x1 ; text frame
+    frame-opcode-non-control= %x1 ; text frame
                             / %x2 ; binary frame
                             / %x3-7
                             ; 4 bits in length,
-                            ; reserved for further non-control frames **]**
+                            ; reserved for further non-control frames
 
-    **SRS_UWS_01_188: [** frame-opcode-control    = %x8 ; connection close
+    frame-opcode-control    = %x8 ; connection close
                             / %x9 ; ping
                             / %xA ; pong
                             / %xB-F ; reserved for further control
                                     ; frames
-                                    ; 4 bits in length **]**
+                                    ; 4 bits in length
 
-    **SRS_UWS_01_189: [** frame-masked            = %x0
+    frame-masked            = %x0
                             ; frame is not masked, no frame-masking-key
                             / %x1
                             ; frame is masked, frame-masking-key present
-                            ; 1 bit in length **]**
+                            ; 1 bit in length
 
-    **SRS_UWS_01_190: [** frame-payload-length    = ( %x00-7D )
+    frame-payload-length    = ( %x00-7D )
                             / ( %x7E frame-payload-length-16 )
                             / ( %x7F frame-payload-length-63 )
                             ; 7, 7+16, or 7+64 bits in length,
-                            ; respectively **]**
+                            ; respectively
 
-    **SRS_UWS_01_191: [** frame-payload-length-16 = %x0000-FFFF ; 16 bits in length **]**
+    frame-payload-length-16 = %x0000-FFFF ; 16 bits in length
 
-    **SRS_UWS_01_192: [** frame-payload-length-63 = %x0000000000000000-7FFFFFFFFFFFFFFF
-                            ; 64 bits in length **]**
+    frame-payload-length-63 = %x0000000000000000-7FFFFFFFFFFFFFFF
+                            ; 64 bits in length
 
-    **SRS_UWS_01_193: [** frame-masking-key       = 4( %x00-FF )
+    frame-masking-key       = 4( %x00-FF )
                               ; present only if frame-masked is 1
-                              ; 32 bits in length **]**
+                              ; 32 bits in length
 
-    **SRS_UWS_01_194: [** frame-payload-data      = (frame-masked-extension-data
+    frame-payload-data      = (frame-masked-extension-data
                                frame-masked-application-data)
                             ; when frame-masked is 1
                               / (frame-unmasked-extension-data
                                 frame-unmasked-application-data)
-                            ; when frame-masked is 0 **]**
+                            ; when frame-masked is 0
 
-    **SRS_UWS_01_195: [** frame-masked-extension-data     = *( %x00-FF )
+    frame-masked-extension-data     = *( %x00-FF )
                             ; reserved for future extensibility
-                            ; n*8 bits in length, where n >= 0 **]**
+                            ; n*8 bits in length, where n >= 0
 
-    **SRS_UWS_01_196: [** frame-masked-application-data   = *( %x00-FF )
-                            ; n*8 bits in length, where n >= 0 **]**
+    frame-masked-application-data   = *( %x00-FF )
+                            ; n*8 bits in length, where n >= 0
 
-    **SRS_UWS_01_197: [** frame-unmasked-extension-data   = *( %x00-FF )
+    frame-unmasked-extension-data   = *( %x00-FF )
                             ; reserved for future extensibility
-                            ; n*8 bits in length, where n >= 0 **]**
+                            ; n*8 bits in length, where n >= 0
 
-    **SRS_UWS_01_198: [** frame-unmasked-application-data = *( %x00-FF )
-                            ; n*8 bits in length, where n >= 0 **]**
+    frame-unmasked-application-data = *( %x00-FF )
+                            ; n*8 bits in length, where n >= 0
 
 5.3.  Client-to-Server Masking
 
-   **SRS_UWS_01_199: [** A masked frame MUST have the field frame-masked set to 1, as defined in Section 5.2. **]**
+   A masked frame MUST have the field frame-masked set to 1, as defined in Section 5.2.
 
-   **SRS_UWS_01_200: [** The masking key is contained completely within the frame, as defined in Section 5.2 as frame-masking-key. **]**
-   **SRS_UWS_01_201: [** It is used to mask the "Payload data" defined in the same section as frame-payload-data, which includes "Extension data" and "Application data". **]**
+   The masking key is contained completely within the frame, as defined in Section 5.2 as frame-masking-key.
+   It is used to mask the "Payload data" defined in the same section as frame-payload-data, which includes "Extension data" and "Application data".
 
-   **SRS_UWS_01_202: [** The masking key is a 32-bit value chosen at random by the client. **]**
-   **SRS_UWS_01_203: [** When preparing a masked frame, the client MUST pick a fresh masking key from the set of allowed 32-bit values. **]**
-   **SRS_UWS_01_204: [** The masking key needs to be unpredictable; thus, the masking key MUST be derived from a strong source of entropy, and the masking key for a given frame MUST NOT make it simple for a server/proxy to predict the masking key for a subsequent frame. **]**
+   The masking key is a 32-bit value chosen at random by the client.
+   When preparing a masked frame, the client MUST pick a fresh masking key from the set of allowed 32-bit values.
+   The masking key needs to be unpredictable; thus, the masking key MUST be derived from a strong source of entropy, and the masking key for a given frame MUST NOT make it simple for a server/proxy to predict the masking key for a subsequent frame.
    The unpredictability of the masking key is essential to prevent authors of malicious applications from selecting the bytes that appear on the wire.
    RFC 4086 [RFC4086] discusses what entails a suitable source of entropy for security-sensitive applications.
 
    The masking does not affect the length of the "Payload data".
-   **SRS_UWS_01_205: [** To convert masked data into unmasked data, or vice versa, the following algorithm is applied. **]**
-   **SRS_UWS_01_206: [** The same algorithm applies regardless of the direction of the translation, e.g., the same steps are applied to mask the data as to unmask the data. **]**
+   To convert masked data into unmasked data, or vice versa, the following algorithm is applied.
+   The same algorithm applies regardless of the direction of the translation, e.g., the same steps are applied to mask the data as to unmask the data.
 
-   **SRS_UWS_01_207: [** Octet i of the transformed data ("transformed-octet-i") is the XOR of octet i of the original data ("original-octet-i") with octet at index i modulo 4 of the masking key ("masking-key-octet-j"): **]**
+   Octet i of the transformed data ("transformed-octet-i") is the XOR of octet i of the original data ("original-octet-i") with octet at index i modulo 4 of the masking key ("masking-key-octet-j"):
 
      j                   = i MOD 4
      transformed-octet-i = original-octet-i XOR masking-key-octet-j
 
-   **SRS_UWS_01_208: [** The payload length, indicated in the framing as frame-payload-length, does NOT include the length of the masking key. **]**
+   The payload length, indicated in the framing as frame-payload-length, does NOT include the length of the masking key.
    It is the length of the "Payload data", e.g., the number of bytes following the masking key.
 
 5.4.  Fragmentation

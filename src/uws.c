@@ -16,6 +16,7 @@
 #include "azure_c_shared_utility/tlsio.h"
 #include "azure_c_shared_utility/crt_abstractions.h"
 #include "azure_c_shared_utility/buffer_.h"
+#include "azure_c_shared_utility/uws_frame_encoder.h"
 
 typedef enum UWS_STATE_TAG
 {
@@ -356,21 +357,30 @@ static void indicate_ws_error(UWS_INSTANCE* uws, WS_ERROR error_code)
 
 static void indicate_ws_error_and_close(UWS_INSTANCE* uws, WS_ERROR error_code, unsigned int close_error_code)
 {
-    unsigned char close_frame[4];
-    close_frame[0] = 0x88;
-    close_frame[1] = 0x02;
-    close_frame[2] = (unsigned char)(close_error_code >> 8);
-    close_frame[3] = (unsigned char)(close_error_code & 0xFF);
+    unsigned char* close_frame;
+    unsigned char close_frame_payload[2];
+    size_t close_frame_length;
+
+    close_frame_payload[0] = (unsigned char)(close_error_code >> 8);
+    close_frame_payload[1] = (unsigned char)(close_error_code & 0xFF);
 
     uws->uws_state = UWS_STATE_ERROR;
-    if (xio_send(uws->underlying_io, close_frame, sizeof(close_frame), NULL, NULL) != 0)
-    {
 
+    if (uws_frame_encoder_encode(uws->encode_buffer, WS_CLOSE_FRAME, close_frame_payload, sizeof(close_frame_payload), true, true, 0) != 0)
+    {
+        LogError("Encoding of CLOSE failed.");
     }
     else
     {
-        uws->on_ws_error(uws->on_ws_error_context, error_code);
+        close_frame = BUFFER_u_char(uws->encode_buffer);
+        close_frame_length = BUFFER_length(uws->encode_buffer);
+        if (xio_send(uws->underlying_io, close_frame, close_frame_length, NULL, NULL) != 0)
+        {
+            LogError("Sending CLOSE frame failed.");
+        }
     }
+
+    uws->on_ws_error(uws->on_ws_error_context, error_code);
 }
 
 static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_result)
@@ -831,4 +841,16 @@ int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* o
     }
 
     return result;
+}
+
+int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, bool is_final, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* callback_context)
+{
+    (void)uws;
+    (void)buffer;
+    (void)size;
+    (void)is_final;
+    (void)on_ws_send_frame_complete;
+    (void)callback_context;
+
+    return 0;
 }

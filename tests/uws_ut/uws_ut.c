@@ -1,6 +1,13 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+#include <stdlib.h>
+#ifdef _CRTDBG_MAP_ALLOC
+#include <crtdbg.h>
+#endif
+#include <stddef.h>
+#include <stdbool.h>
+
 #include "testrunnerswitcher.h"
 #include "umock_c.h"
 #include "umocktypes_charptr.h"
@@ -3004,11 +3011,16 @@ TEST_FUNCTION(when_a_masked_frame_is_received_an_error_is_indicated_and_connecti
     UWS_HANDLE uws;
     const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
     unsigned char test_frame[] = { 0x82, 0x80 };
-    unsigned char close_frame[] = { 0x88, 0x02, 0x03, 0xEA };
+    unsigned char close_frame_payload[] = { 0x03, 0xEA };
+    unsigned char close_frame[] = { 0x88, 0x82, 0x00, 0x00, 0x00, 0x00, 0x03, 0xEA };
+    BUFFER_HANDLE buffer_handle;
 
     tlsio_config.hostname = "test_host";
     tlsio_config.port = 444;
 
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
     uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
     (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
     g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
@@ -3016,6 +3028,10 @@ TEST_FUNCTION(when_a_masked_frame_is_received_an_error_is_indicated_and_connecti
     umock_c_reset_all_calls();
 
     EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(uws_frame_encoder_encode(buffer_handle, WS_CLOSE_FRAME, IGNORED_PTR_ARG, sizeof(close_frame_payload), true, true, 0))
+        .ValidateArgumentBuffer(3, close_frame_payload, sizeof(close_frame_payload));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(buffer_handle)).SetReturn(close_frame);
+    STRICT_EXPECTED_CALL(BUFFER_length(buffer_handle)).SetReturn(sizeof(close_frame));
     STRICT_EXPECTED_CALL(xio_send(TEST_IO_HANDLE, close_frame, sizeof(close_frame), NULL, NULL))
         .ValidateArgumentBuffer(2, close_frame, sizeof(close_frame));
     STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_BAD_FRAME_RECEIVED));
@@ -3028,6 +3044,110 @@ TEST_FUNCTION(when_a_masked_frame_is_received_an_error_is_indicated_and_connecti
 
     // cleanup
     uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_144: [ A client MUST close a connection if it detects a masked frame. ]*/
+/* Tests_SRS_UWS_01_145: [ In this case, it MAY use the status code 1002 (protocol error) as defined in Section 7.4.1. (These rules might be relaxed in a future specification.) ]*/
+/* Tests_SRS_UWS_01_160: [ Defines whether the "Payload data" is masked. ]*/
+TEST_FUNCTION(when_a_masked_frame_is_received_and_encoding_the_close_frame_fails_an_error_is_indicated_anyhow)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_frame[] = { 0x82, 0x80 };
+    unsigned char close_frame_payload[] = { 0x03, 0xEA };
+    BUFFER_HANDLE buffer_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(uws_frame_encoder_encode(buffer_handle, WS_CLOSE_FRAME, IGNORED_PTR_ARG, sizeof(close_frame_payload), true, true, 0))
+        .ValidateArgumentBuffer(3, close_frame_payload, sizeof(close_frame_payload))
+        .SetReturn(1);
+    STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_BAD_FRAME_RECEIVED));
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_144: [ A client MUST close a connection if it detects a masked frame. ]*/
+/* Tests_SRS_UWS_01_145: [ In this case, it MAY use the status code 1002 (protocol error) as defined in Section 7.4.1. (These rules might be relaxed in a future specification.) ]*/
+/* Tests_SRS_UWS_01_160: [ Defines whether the "Payload data" is masked. ]*/
+TEST_FUNCTION(when_a_masked_frame_is_received_and_sending_the_encoded_CLOSE_frame_fails_an_error_is_indicated_anyhow)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_frame[] = { 0x82, 0x80 };
+    unsigned char close_frame_payload[] = { 0x03, 0xEA };
+    unsigned char close_frame[] = { 0x88, 0x82, 0x00, 0x00, 0x00, 0x00, 0x03, 0xEA };
+    BUFFER_HANDLE buffer_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(uws_frame_encoder_encode(buffer_handle, WS_CLOSE_FRAME, IGNORED_PTR_ARG, sizeof(close_frame_payload), true, true, 0))
+        .ValidateArgumentBuffer(3, close_frame_payload, sizeof(close_frame_payload));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(buffer_handle)).SetReturn(close_frame);
+    STRICT_EXPECTED_CALL(BUFFER_length(buffer_handle)).SetReturn(sizeof(close_frame));
+    STRICT_EXPECTED_CALL(xio_send(TEST_IO_HANDLE, close_frame, sizeof(close_frame), NULL, NULL))
+        .ValidateArgumentBuffer(2, close_frame, sizeof(close_frame))
+        .SetReturn(1);
+    STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_BAD_FRAME_RECEIVED));
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, test_frame, sizeof(test_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* uws_send_frame */
+
+/* Tests_SRS_UWS_01_044: [ If any the arguments `uws` is NULL, `uws_send_frame` shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(uws_send_frame_with_NULL_handle_fails)
+{
+    // arrange
+    unsigned char test_payload[] = { 0x42 };
+    int result;
+
+    // act
+    result = uws_send_frame(NULL, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4248);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 }
 
 END_TEST_SUITE(uws_ut)
