@@ -190,6 +190,8 @@ TEST_FUNCTION(uws_frame_encoder_encode_with_NULL_buffer_fails)
 /* Tests_SRS_UWS_FRAME_ENCODER_01_002: [ Indicates that this is the final fragment in a message. ]*/
 /* Tests_SRS_UWS_FRAME_ENCODER_01_003: [ The first fragment MAY also be the final fragment. ]*/
 /* Tests_SRS_UWS_FRAME_ENCODER_01_015: [ Defines whether the "Payload data" is masked. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_018: [ The length of the "Payload data", in bytes: ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_043: [ if 0-125, that is the payload length. ]*/
 TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_zero_length_binary_frame)
 {
     // arrange
@@ -866,6 +868,7 @@ TEST_FUNCTION(uws_frame_encoder_encodes_a_reserved_control_frame_F)
 
 /* Tests_SRS_UWS_FRAME_ENCODER_01_015: [ Defines whether the "Payload data" is masked. ]*/
 /* Tests_SRS_UWS_FRAME_ENCODER_01_053: [ In order to obtain a 32 bit value for masking, `gb_rand` shall be used 4 times (for each byte). ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_016: [ If set to 1, a masking key is present in masking-key, and this is used to unmask the "Payload data" as per Section 5.3. ]*/
 TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_masked_zero_length_binary_frame)
 {
     // arrange
@@ -896,6 +899,202 @@ TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_masked_zero_length_binary_frame
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 
     // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_015: [ Defines whether the "Payload data" is masked. ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_053: [ In order to obtain a 32 bit value for masking, `gb_rand` shall be used 4 times (for each byte). ]*/
+/* Tests_SRS_UWS_FRAME_ENCODER_01_016: [ If set to 1, a masking key is present in masking-key, and this is used to unmask the "Payload data" as per Section 5.3. ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_masked_zero_length_binary_frame_different_mask)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char expected_bytes[] = { 0x82, 0x80, 0x42, 0x43, 0x44, 0x45 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, sizeof(expected_bytes)));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0x42);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0x43);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0x44);
+    STRICT_EXPECTED_CALL(gb_rand())
+        .SetReturn(0x45);
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, NULL, 0, true, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_043: [ if 0-125, that is the payload length. ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_1_byte_long_binary_frame)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char payload[] = { 0x42 };
+    unsigned char expected_bytes[] = { 0x82, 0x01, 0x42 };
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, sizeof(expected_bytes)));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, payload, sizeof(payload), false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, sizeof(expected_bytes), expected_encoded_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, expected_encoded_str, actual_encoded_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_043: [ if 0-125, that is the payload length. ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_125_byte_long_binary_frame)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char* payload = (unsigned char*)malloc(125);
+    unsigned char* expected_bytes = (unsigned char*)malloc(125 + 2);
+    char* temp_expected_str = (char*)malloc(200 * 5);
+    char* temp_actual_str = (char*)malloc(200 * 5);
+    size_t i;
+
+    expected_bytes[0] = 0x82;
+    expected_bytes[1] = 0x7D;
+
+    for (i = 0; i < 125; i++)
+    {
+        payload[i] = (unsigned char)i;
+        expected_bytes[i + 2] = (unsigned char)i;
+    }
+
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 125 + 2));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, payload, 125, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, 125 + 2, temp_expected_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), temp_actual_str);
+    ASSERT_ARE_EQUAL(char_ptr, temp_expected_str, temp_actual_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    free(temp_expected_str);
+    free(temp_actual_str);
+    free(expected_bytes);
+    free(payload);
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_019: [ If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length. ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_126_byte_long_binary_frame)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char* payload = (unsigned char*)malloc(126);
+    unsigned char* expected_bytes = (unsigned char*)malloc(126 + 4);
+    char* temp_expected_str = (char*)malloc(200 * 5);
+    char* temp_actual_str = (char*)malloc(200 * 5);
+    size_t i;
+
+    expected_bytes[0] = 0x82;
+    expected_bytes[1] = 0x7E;
+    expected_bytes[2] = 0x00;
+    expected_bytes[3] = 0x7E;
+
+    for (i = 0; i < 126; i++)
+    {
+        payload[i] = (unsigned char)i;
+        expected_bytes[i + 4] = (unsigned char)i;
+    }
+
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 126 + 4));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, payload, 126, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    stringify_bytes(expected_bytes, 126 + 4, temp_expected_str);
+    stringify_bytes(real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer), temp_actual_str);
+    ASSERT_ARE_EQUAL(char_ptr, temp_expected_str, temp_actual_str);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    free(temp_expected_str);
+    free(temp_actual_str);
+    free(expected_bytes);
+    free(payload);
+    real_BUFFER_delete(encode_buffer);
+}
+
+/* Tests_SRS_UWS_FRAME_ENCODER_01_019: [ If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length. ]*/
+TEST_FUNCTION(uws_frame_encoder_encode_encodes_a_65535_byte_long_binary_frame)
+{
+    // arrange
+    int result;
+    BUFFER_HANDLE encode_buffer = real_BUFFER_new();
+    unsigned char* payload = (unsigned char*)malloc(65535);
+    unsigned char* expected_bytes = (unsigned char*)malloc(65535 + 4);
+    uint32_t i;
+
+    expected_bytes[0] = 0x82;
+    expected_bytes[1] = 0x7E;
+    expected_bytes[2] = 0xFF;
+    expected_bytes[3] = 0xFF;
+
+    for (i = 0; i < 65535; i++)
+    {
+        payload[i] = (unsigned char)i;
+        expected_bytes[i + 4] = (unsigned char)i;
+    }
+
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(BUFFER_unbuild(encode_buffer));
+    STRICT_EXPECTED_CALL(BUFFER_enlarge(encode_buffer, 65535 + 4));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(encode_buffer));
+
+    // act
+    result = uws_frame_encoder_encode(encode_buffer, WS_BINARY_FRAME, payload, 65535, false, true, 0);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL_WITH_MSG(int, 0, memcmp(expected_bytes, real_BUFFER_u_char(encode_buffer), real_BUFFER_length(encode_buffer)), "Memory compare failed");
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    free(expected_bytes);
+    free(payload);
     real_BUFFER_delete(encode_buffer);
 }
 

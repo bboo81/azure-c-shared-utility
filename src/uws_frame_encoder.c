@@ -58,7 +58,7 @@ int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, WS_FRAME_TYPE opcode, 
             }
             else if (length > 125)
             {
-
+                needed_bytes += 2;
             }
 
             if (is_masked)
@@ -108,16 +108,21 @@ int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, WS_FRAME_TYPE opcode, 
                     /* Codes_SRS_UWS_FRAME_ENCODER_01_004: [ MUST be 0 unless an extension is negotiated that defines meanings for non-zero values. ]*/
                     buffer[0] |= reserved << 4;
 
+                    /* Codes_SRS_UWS_FRAME_ENCODER_01_018: [ The length of the "Payload data", in bytes: ]*/
                     if (length > 65535)
                     {
 
                     }
                     else if (length > 125)
                     {
-
+                        /* Codes_SRS_UWS_FRAME_ENCODER_01_019: [ If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length. ]*/
+                        buffer[1] = 126;
+                        buffer[2] = (unsigned char)(length >> 8);
+                        buffer[3] = (unsigned char)(length & 0xFF);
                     }
                     else
                     {
+                        /* Codes_SRS_UWS_FRAME_ENCODER_01_043: [ if 0-125, that is the payload length. ]*/
                         buffer[1] = (unsigned char)length;
                     }
 
@@ -127,6 +132,7 @@ int uws_frame_encoder_encode(BUFFER_HANDLE encode_buffer, WS_FRAME_TYPE opcode, 
                         buffer[1] |= 0x80;
 
                         /* Codes_SRS_UWS_FRAME_ENCODER_01_053: [ In order to obtain a 32 bit value for masking, `gb_rand` shall be used 4 times (for each byte). ]*/
+                        /* Codes_SRS_UWS_FRAME_ENCODER_01_016: [ If set to 1, a masking key is present in masking-key, and this is used to unmask the "Payload data" as per Section 5.3. ]*/
                         buffer[header_bytes - 4] = (unsigned char)gb_rand();
                         buffer[header_bytes - 3] = (unsigned char)gb_rand();
                         buffer[header_bytes - 2] = (unsigned char)gb_rand();

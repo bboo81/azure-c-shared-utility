@@ -122,14 +122,14 @@ XX**SRS_UWS_FRAME_ENCODER_01_053: [** In order to obtain a 32 bit value for mask
 
    Mask:  1 bit
 
-      **SRS_UWS_FRAME_ENCODER_01_015: [** Defines whether the "Payload data" is masked. **]**
-      **SRS_UWS_FRAME_ENCODER_01_016: [** If set to 1, a masking key is present in masking-key, and this is used to unmask the "Payload data" as per Section 5.3. **]**
-      **SRS_UWS_FRAME_ENCODER_01_017: [** All frames sent from client to server have this bit set to 1. **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_015: [** Defines whether the "Payload data" is masked. **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_016: [** If set to 1, a masking key is present in masking-key, and this is used to unmask the "Payload data" as per Section 5.3. **]**
+      All frames sent from client to server have this bit set to 1.
 
    Payload length:  7 bits, 7+16 bits, or 7+64 bits
 
-      **SRS_UWS_FRAME_ENCODER_01_018: [** The length of the "Payload data", in bytes: **]** XX**SRS_UWS_FRAME_ENCODER_01_043: [** if 0-125, that is the payload length. **]**
-      **SRS_UWS_FRAME_ENCODER_01_019: [** If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length. **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_018: [** The length of the "Payload data", in bytes: **]** XX**SRS_UWS_FRAME_ENCODER_01_043: [** if 0-125, that is the payload length. **]**
+      XX**SRS_UWS_FRAME_ENCODER_01_019: [** If 126, the following 2 bytes interpreted as a 16-bit unsigned integer are the payload length. **]**
       **SRS_UWS_FRAME_ENCODER_01_020: [** If 127, the following 8 bytes interpreted as a 64-bit unsigned integer (the most significant bit MUST be 0) are the payload length. **]**
       **SRS_UWS_FRAME_ENCODER_01_021: [** Multibyte length quantities are expressed in network byte order. **]**
       **SRS_UWS_FRAME_ENCODER_01_022: [** Note that in all cases, the minimal number of bytes MUST be used to encode the length, for example, the length of a 124-byte-long string can't be encoded as the sequence 126, 0, 124. **]**
