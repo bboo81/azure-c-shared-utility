@@ -141,22 +141,32 @@ XX**SRS_UWS_01_033: [** `uws_close` after a `uws_close` shall fail and return a 
 ### uws_send_frame
 
 ```c
-extern int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, bool is_final, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* callback_context);
+extern int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, bool is_final, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* on_ws_send_frame_complete_context);
 ```
 
-**SRS_UWS_01_038: [** `uws_send_frame` shall create and queue a structure that contains: **]**
-**SRS_UWS_01_039: [** - the websocket frame containing the `size` bytes pointed by `buffer`, so that the frame can be later sent when `uws_dowork` is called **]**
-**SRS_UWS_01_040: [** - the send complete callback `on_ws_send_frame_complete` **]**
-**SRS_UWS_01_041: [** - the send complete callback context `on_send_complete_context` **]**
-**SRS_UWS_01_042: [** On success, `uws_send_frame` shall return 0. **]**
+XX**SRS_UWS_01_038: [** `uws_send_frame` shall create and queue a structure that contains: **]**
+XX**SRS_UWS_01_040: [** - the send complete callback `on_ws_send_frame_complete` **]**
+XX**SRS_UWS_01_041: [** - the send complete callback context `on_ws_send_frame_complete_context` **]**
+XX**SRS_UWS_01_042: [** On success, `uws_send_frame` shall return 0. **]**
+XX**SRS_UWS_01_425: [** Encoding shall be done by calling `uws_frame_encoder_encode` and passing to it the `buffer` and `size` argument for payload, the `is_final` flag and setting `is_masked` to true. **]**
+XX**SRS_UWS_01_426: [** If `uws_frame_encoder_encode` fails, `uws_send_frame` shall fail and return a non-zero value. **]**
+XX**SRS_UWS_01_427: [** The encoded frame buffer that shall be used is the buffer created in `uws_create`. **]**
+XX**SRS_UWS_01_428: [** The encoded frame buffer memory shall be obtained by calling `BUFFER_u_char` on the encode buffer. **]**
+XX**SRS_UWS_01_429: [** The encoded frame size shall be obtained by calling `BUFFER_length` on the encode buffer. **]**
+XX**SRS_UWS_01_431: [** Once encoded the frame shall be sent by using `xio_send` with the following arguments: **]**
+XX**SRS_UWS_01_053: [** - the io handle shall be the underlyiong IO handle created in `uws_create`. **]**
+XX**SRS_UWS_01_054: [** - the `buffer` argument shall point to the complete websocket frame to be sent. **]**
+XX**SRS_UWS_01_055: [** - the `size` argument shall indicate the websocket frame length. **]**
+XX**SRS_UWS_01_056: [** - the `send_complete` callback shall be the `on_underlying_io_send_complete` function. **]**
+XX**SRS_UWS_01_057: [** - the `send_complete_context` argument shall identify the pending send. **]**
+XX**SRS_UWS_01_058: [** If `xio_send` fails, `uws_send_frame` shall fail and return a non-zero value. **]** 
 XX**SRS_UWS_01_043: [** If the uws instance is not OPEN (open has not been called or is still in progress) then `uws_send_frame` shall fail and return a non-zero value. **]**
 XX**SRS_UWS_01_044: [** If the argument `uws` is NULL, `uws_send_frame` shall fail and return a non-zero value. **]**
 XX**SRS_UWS_01_045: [** If `size` is non-zero and `buffer` is NULL then `uws_send_frame` shall fail and return a non-zero value. **]**
-**SRS_UWS_01_046: [** `uws_send_frame` shall allocate enough memory to hold the websocket frame that contains `size` bytes. **]**
-**SRS_UWS_01_047: [** If allocating memory for the newly queued item fails, `uws_send_frame` shall fail and return a non-zero value. **]**
-**SRS_UWS_01_048: [** Queueing shall be done by calling `singlylinkedlist_add`. **]**
-**SRS_UWS_01_049: [** If `singlylinkedlist_add` fails, `uws_send_frame` shall fail and return a non-zero value. **]**
-**SRS_UWS_01_050: [** The argument `on_ws_send_frame_complete` shall be optional, if NULL is passed by the caller then no send complete callback shall be triggered. **]**
+XX**SRS_UWS_01_047: [** If allocating memory for the newly queued item fails, `uws_send_frame` shall fail and return a non-zero value. **]**
+XX**SRS_UWS_01_048: [** Queueing shall be done by calling `singlylinkedlist_add`. **]**
+XX**SRS_UWS_01_049: [** If `singlylinkedlist_add` fails, `uws_send_frame` shall fail and return a non-zero value. **]**
+XX**SRS_UWS_01_050: [** The argument `on_ws_send_frame_complete` shall be optional, if NULL is passed by the caller then no send complete callback shall be triggered. **]**
 
 ### uws_dowork
 
@@ -164,16 +174,9 @@ XX**SRS_UWS_01_045: [** If `size` is non-zero and `buffer` is NULL then `uws_sen
 extern void uws_dowork(UWS_HANDLE uws);
 ```
 
-**SRS_UWS_01_051: [** `uws_dowork` shall iterate through all the pending sends and for each one of them: **]**
-**SRS_UWS_01_052: [** `uws_dowork` shall call `xio_send` to send the websocket frame with the following arguments: **]**
-**SRS_UWS_01_053: [** - the io handle shall be the underlyiong IO handle created in `uws_create`. **]**
-**SRS_UWS_01_054: [** - the `buffer` argument shall point to the complete websocket frame to be sent. **]**
-**SRS_UWS_01_055: [** - the `size` argument shall indicate the websocket frame length. **]**
-**SRS_UWS_01_056: [** - the `send_complete` callback shall be the `uws_send_complete` function. **]**
-**SRS_UWS_01_057: [** - the `send_complete_context` argument shall identify the pending send. **]**
-**SRS_UWS_01_058: [** If `xio_send` fails, `uws_dowork` shall indicate that by calling the `on_ws_send_frame_complete` callback associated with the pending send with the `UWS_SEND_ERROR` code. **]** 
 **SRS_UWS_01_059: [** If the `uws` argument is NULL, `uws_dowork` shall do nothing. **]**
 **SRS_UWS_01_060: [** If the IO is not yet open, `uws_dowork` shall do nothing. **]**
+**SRS_UWS_01_430: [** `uws_dowork` shall call `xio_dowork` with the IO handle argument set to the underlying IO created in `uws_create`. **]**
 
 ### on_underlying_io_open_complete
 

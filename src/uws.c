@@ -41,6 +41,12 @@ typedef struct WS_INSTANCE_PROTOCOL_TAG
     char* protocol;
 } WS_INSTANCE_PROTOCOL;
 
+typedef struct WS_PENDING_SEND_TAG
+{
+    ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete;
+    void* context;
+} WS_PENDING_SEND;
+
 #define OPCODE_CONTINUATION_FRAME   0x0
 #define OPCODE_TEXT_FRAME           0x1
 #define OPCODE_BINARY_FRAME         0x2
@@ -843,13 +849,15 @@ int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* o
     return result;
 }
 
-int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, bool is_final, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* callback_context)
+static void on_underlying_io_send_complete(void* context, IO_SEND_RESULT send_result)
+{
+    (void)context;
+    (void)send_result;
+}
+
+int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, bool is_final, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* on_ws_send_frame_complete_context)
 {
     int result;
-
-    (void)is_final;
-    (void)on_ws_send_frame_complete;
-    (void)callback_context;
 
     if (uws == NULL)
     {
@@ -872,7 +880,72 @@ int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, boo
     }
     else
     {
-        result = 0;
+        WS_PENDING_SEND* ws_pending_send = (WS_PENDING_SEND*)malloc(sizeof(WS_PENDING_SEND));
+        if (ws_pending_send == NULL)
+        {
+            /* Codes_SRS_UWS_01_047: [ If allocating memory for the newly queued item fails, `uws_send_frame` shall fail and return a non-zero value. ]*/
+            LogError("Cannot allocate memory for frame to be sent.");
+            result = __LINE__;
+        }
+        else
+        {
+            /* Codes_SRS_UWS_01_425: [ Encoding shall be done by calling `uws_frame_encoder_encode` and passing to it the `buffer` and `size` argument for payload, the `is_final` flag and setting `is_masked` to true. ]*/
+            /* Codes_SRS_UWS_01_427: [ The encoded frame buffer that shall be used is the buffer created in `uws_create`. ]*/
+            if (uws_frame_encoder_encode(uws->encode_buffer, WS_BINARY_FRAME, buffer, size, true, is_final, 0) != 0)
+            {
+                /* Codes_SRS_UWS_01_426: [ If `uws_frame_encoder_encode` fails, `uws_send_frame` shall fail and return a non-zero value. ]*/
+                free(ws_pending_send);
+                result = __LINE__;
+            }
+            else
+            {
+                const unsigned char* encoded_frame;
+                size_t encoded_frame_length;
+                LIST_ITEM_HANDLE new_pending_send_list_item;
+
+                /* Codes_SRS_UWS_01_428: [ The encoded frame buffer memory shall be obtained by calling `BUFFER_u_char` on the encode buffer. ]*/
+                encoded_frame = BUFFER_u_char(uws->encode_buffer);
+                /* Codes_SRS_UWS_01_429: [ The encoded frame size shall be obtained by calling `BUFFER_length` on the encode buffer. ]*/
+                encoded_frame_length = BUFFER_length(uws->encode_buffer);
+
+                /* Codes_SRS_UWS_01_038: [ `uws_send_frame` shall create and queue a structure that contains: ]*/
+                /* Codes_SRS_UWS_01_050: [ The argument `on_ws_send_frame_complete` shall be optional, if NULL is passed by the caller then no send complete callback shall be triggered. ]*/
+                /* Codes_SRS_UWS_01_040: [ - the send complete callback `on_ws_send_frame_complete` ]*/
+                /* Codes_SRS_UWS_01_041: [ - the send complete callback context `on_ws_send_frame_complete_context` ]*/
+                ws_pending_send->on_ws_send_frame_complete = on_ws_send_frame_complete;
+                ws_pending_send->context = on_ws_send_frame_complete_context;
+
+                /* Codes_SRS_UWS_01_048: [ Queueing shall be done by calling `singlylinkedlist_add`. ]*/
+                new_pending_send_list_item = singlylinkedlist_add(uws->pending_sends, ws_pending_send);
+                if (new_pending_send_list_item == NULL)
+                {
+                    /* Codes_SRS_UWS_01_049: [ If `singlylinkedlist_add` fails, `uws_send_frame` shall fail and return a non-zero value. ]*/
+                    free(ws_pending_send);
+                    result = __LINE__;
+                }
+                else
+                {
+                    /* Codes_SRS_UWS_01_431: [ Once encoded the frame shall be sent by using `xio_send` with the following arguments: ]*/
+                    /* Codes_SRS_UWS_01_053: [ - the io handle shall be the underlyiong IO handle created in `uws_create`. ]*/
+                    /* Codes_SRS_UWS_01_054: [ - the `buffer` argument shall point to the complete websocket frame to be sent. ]*/
+                    /* Codes_SRS_UWS_01_055: [ - the `size` argument shall indicate the websocket frame length. ]*/
+                    /* Codes_SRS_UWS_01_056: [ - the `send_complete` callback shall be the `on_underlying_io_send_complete` function. ]*/
+                    /* Codes_SRS_UWS_01_057: [ - the `send_complete_context` argument shall identify the pending send. ]*/
+                    if (xio_send(uws->underlying_io, encoded_frame, encoded_frame_length, on_underlying_io_send_complete, ws_pending_send) != 0)
+                    {
+                        /* Codes_SRS_UWS_01_058: [ If `xio_send` fails, `uws_send_frame` shall fail and return a non-zero value. ]*/
+                        (void)singlylinkedlist_remove(uws->pending_sends, new_pending_send_list_item);
+                        free(ws_pending_send);
+                        result = __LINE__;
+                    }
+                    else
+                    {
+                        /* Codes_SRS_UWS_01_042: [ On success, `uws_send_frame` shall return 0. ]*/
+                        result = 0;
+                    }
+                }
+            }
+        }
     }
 
     return result;

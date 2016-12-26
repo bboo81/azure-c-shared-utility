@@ -3260,4 +3260,302 @@ TEST_FUNCTION(uws_send_frame_when_waiting_for_upgrade_response_fails)
     uws_destroy(uws);
 }
 
+/* Tests_SRS_UWS_01_038: [ `uws_send_frame` shall create and queue a structure that contains: ]*/
+/* Tests_SRS_UWS_01_039: [ - the encoded websocket frame, so that the frame can be later sent when `uws_dowork` is called ]*/
+/* Tests_SRS_UWS_01_040: [ - the send complete callback `on_ws_send_frame_complete` ]*/
+/* Tests_SRS_UWS_01_056: [ - the `send_complete` callback shall be the `on_underlying_io_send_complete` function. ]*/
+/* Tests_SRS_UWS_01_042: [ On success, `uws_send_frame` shall return 0. ]*/
+/* Tests_SRS_UWS_01_425: [ Encoding shall be done by calling `uws_frame_encoder_encode` and passing to it the `buffer` and `size` argument for payload, the `is_final` flag and setting `is_masked` to true. ]*/
+/* Tests_SRS_UWS_01_427: [ The encoded frame buffer that shall be used is the buffer created in `uws_create`. ]*/
+/* Tests_SRS_UWS_01_428: [ The encoded frame buffer memory shall be obtained by calling `BUFFER_u_char` on the encode buffer. ]*/
+/* Tests_SRS_UWS_01_429: [ The encoded frame size shall be obtained by calling `BUFFER_length` on the encode buffer. ]*/
+/* Tests_SRS_UWS_01_048: [ Queueing shall be done by calling `singlylinkedlist_add`. ]*/
+/* Tests_SRS_UWS_01_038: [ `uws_send_frame` shall create and queue a structure that contains: ]*/
+/* Tests_SRS_UWS_01_040: [ - the send complete callback `on_ws_send_frame_complete` ]*/
+/* Tests_SRS_UWS_01_041: [ - the send complete callback context `on_ws_send_frame_complete_context` ]*/
+TEST_FUNCTION(uws_send_frame_succeeds)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_payload[] = { 0x42 };
+    unsigned char encoded_frame[] = { 0x82, 0x01, 0x00, 0x00, 0x00, 0x00, 0x42 };
+    int result;
+    BUFFER_HANDLE buffer_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(uws_frame_encoder_encode(IGNORED_PTR_ARG, WS_BINARY_FRAME, test_payload, sizeof(test_payload), true, true, 0))
+        .ValidateArgumentValue_encode_buffer(&buffer_handle);
+    STRICT_EXPECTED_CALL(BUFFER_u_char(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle)
+        .SetReturn(encoded_frame);
+    STRICT_EXPECTED_CALL(BUFFER_length(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle)
+        .SetReturn(sizeof(encoded_frame));
+    STRICT_EXPECTED_CALL(singlylinkedlist_add(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_NUM_ARG))
+        .IgnoreArgument_item();
+    STRICT_EXPECTED_CALL(xio_send(TEST_IO_HANDLE, IGNORED_PTR_ARG, sizeof(encoded_frame), IGNORED_PTR_ARG, IGNORED_PTR_ARG))
+        .IgnoreArgument_on_send_complete()
+        .IgnoreArgument_callback_context()
+        .ValidateArgumentBuffer(2, encoded_frame, sizeof(encoded_frame));
+
+    // act
+    result = uws_send_frame(uws, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4248);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_047: [ If allocating memory for the newly queued item fails, `uws_send_frame` shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(when_allocating_memory_for_the_new_sent_item_fails_uws_send_frame_fails)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_payload[] = { 0x42 };
+    int result;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG))
+        .SetReturn(NULL);
+
+    // act
+    result = uws_send_frame(uws, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4248);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_426: [ If `uws_frame_encoder_encode` fails, `uws_send_frame` shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(when_encoding_the_frame_fails_uws_send_frame_fails)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_payload[] = { 0x42 };
+    int result;
+    BUFFER_HANDLE buffer_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(uws_frame_encoder_encode(IGNORED_PTR_ARG, WS_BINARY_FRAME, test_payload, sizeof(test_payload), true, true, 0))
+        .ValidateArgumentValue_encode_buffer(&buffer_handle)
+        .SetReturn(1);
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    result = uws_send_frame(uws, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4248);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_058: [ If `xio_send` fails, `uws_send_frame` shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(when_xio_send_fails_uws_send_frame_fails)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_payload[] = { 0x42 };
+    unsigned char encoded_frame[] = { 0x82, 0x01, 0x00, 0x00, 0x00, 0x00, 0x42 };
+    int result;
+    BUFFER_HANDLE buffer_handle;
+    LIST_ITEM_HANDLE new_item_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(uws_frame_encoder_encode(IGNORED_PTR_ARG, WS_BINARY_FRAME, test_payload, sizeof(test_payload), true, true, 0))
+        .ValidateArgumentValue_encode_buffer(&buffer_handle);
+    STRICT_EXPECTED_CALL(BUFFER_u_char(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle)
+        .SetReturn(encoded_frame);
+    STRICT_EXPECTED_CALL(BUFFER_length(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle)
+        .SetReturn(sizeof(encoded_frame));
+    STRICT_EXPECTED_CALL(singlylinkedlist_add(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_NUM_ARG))
+        .IgnoreArgument_item()
+        .CaptureReturn(&new_item_handle);
+    STRICT_EXPECTED_CALL(xio_send(TEST_IO_HANDLE, IGNORED_PTR_ARG, sizeof(encoded_frame), IGNORED_PTR_ARG, IGNORED_PTR_ARG))
+        .IgnoreArgument_on_send_complete()
+        .IgnoreArgument_callback_context()
+        .ValidateArgumentBuffer(2, encoded_frame, sizeof(encoded_frame))
+        .SetReturn(1);
+    STRICT_EXPECTED_CALL(singlylinkedlist_remove(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG))
+        .ValidateArgumentValue_item_handle(&new_item_handle);
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    result = uws_send_frame(uws, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4248);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_049: [ If `singlylinkedlist_add` fails, `uws_send_frame` shall fail and return a non-zero value. ]*/
+TEST_FUNCTION(when_adding_the_item_to_the_list_fails_uws_send_frame_fails)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_payload[] = { 0x42 };
+    unsigned char encoded_frame[] = { 0x82, 0x01, 0x00, 0x00, 0x00, 0x00, 0x42 };
+    int result;
+    BUFFER_HANDLE buffer_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(uws_frame_encoder_encode(IGNORED_PTR_ARG, WS_BINARY_FRAME, test_payload, sizeof(test_payload), true, true, 0))
+        .ValidateArgumentValue_encode_buffer(&buffer_handle);
+    STRICT_EXPECTED_CALL(BUFFER_u_char(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle)
+        .SetReturn(encoded_frame);
+    STRICT_EXPECTED_CALL(BUFFER_length(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle)
+        .SetReturn(sizeof(encoded_frame));
+    STRICT_EXPECTED_CALL(singlylinkedlist_add(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_NUM_ARG))
+        .IgnoreArgument_item()
+        .SetReturn(NULL);
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    result = uws_send_frame(uws, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4248);
+
+    // assert
+    ASSERT_ARE_NOT_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_050: [ The argument `on_ws_send_frame_complete` shall be optional, if NULL is passed by the caller then no send complete callback shall be triggered. ]*/
+TEST_FUNCTION(uws_send_frame_with_NULL_complete_callback_succeeds)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_payload[] = { 0x42 };
+    unsigned char encoded_frame[] = { 0x82, 0x01, 0x00, 0x00, 0x00, 0x00, 0x42 };
+    int result;
+    BUFFER_HANDLE buffer_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(uws_frame_encoder_encode(IGNORED_PTR_ARG, WS_BINARY_FRAME, test_payload, sizeof(test_payload), true, true, 0))
+        .ValidateArgumentValue_encode_buffer(&buffer_handle);
+    STRICT_EXPECTED_CALL(BUFFER_u_char(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle)
+        .SetReturn(encoded_frame);
+    STRICT_EXPECTED_CALL(BUFFER_length(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle)
+        .SetReturn(sizeof(encoded_frame));
+    STRICT_EXPECTED_CALL(singlylinkedlist_add(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_NUM_ARG))
+        .IgnoreArgument_item();
+    STRICT_EXPECTED_CALL(xio_send(TEST_IO_HANDLE, IGNORED_PTR_ARG, sizeof(encoded_frame), IGNORED_PTR_ARG, IGNORED_PTR_ARG))
+        .IgnoreArgument_on_send_complete()
+        .IgnoreArgument_callback_context()
+        .ValidateArgumentBuffer(2, encoded_frame, sizeof(encoded_frame));
+
+    // act
+    result = uws_send_frame(uws, test_payload, sizeof(test_payload), true, NULL, NULL);
+
+    // assert
+    ASSERT_ARE_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
 END_TEST_SUITE(uws_ut)
