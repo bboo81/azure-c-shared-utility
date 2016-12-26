@@ -45,6 +45,7 @@ typedef struct WS_PENDING_SEND_TAG
 {
     ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete;
     void* context;
+    UWS_HANDLE uws;
 } WS_PENDING_SEND;
 
 #define OPCODE_CONTINUATION_FRAME   0x0
@@ -851,8 +852,23 @@ int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* o
 
 static void on_underlying_io_send_complete(void* context, IO_SEND_RESULT send_result)
 {
-    (void)context;
-    (void)send_result;
+    LIST_ITEM_HANDLE ws_pending_send_list_item = (LIST_ITEM_HANDLE)context;
+    WS_PENDING_SEND* ws_pending_send = (WS_PENDING_SEND*)singlylinkedlist_item_get_value(ws_pending_send_list_item);
+    UWS_HANDLE uws = ws_pending_send->uws;
+
+    singlylinkedlist_remove(uws->pending_sends, ws_pending_send_list_item);
+
+    switch (send_result)
+    {
+    default:
+        break;
+
+    case IO_SEND_OK:
+        ws_pending_send->on_ws_send_frame_complete(ws_pending_send->context, WS_SEND_FRAME_OK);
+        break;
+    }
+
+    free(ws_pending_send);
 }
 
 int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, bool is_final, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* on_ws_send_frame_complete_context)
@@ -914,6 +930,7 @@ int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, boo
                 /* Codes_SRS_UWS_01_041: [ - the send complete callback context `on_ws_send_frame_complete_context` ]*/
                 ws_pending_send->on_ws_send_frame_complete = on_ws_send_frame_complete;
                 ws_pending_send->context = on_ws_send_frame_complete_context;
+                ws_pending_send->uws = uws;
 
                 /* Codes_SRS_UWS_01_048: [ Queueing shall be done by calling `singlylinkedlist_add`. ]*/
                 new_pending_send_list_item = singlylinkedlist_add(uws->pending_sends, ws_pending_send);
@@ -931,7 +948,7 @@ int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, boo
                     /* Codes_SRS_UWS_01_055: [ - the `size` argument shall indicate the websocket frame length. ]*/
                     /* Codes_SRS_UWS_01_056: [ - the `send_complete` callback shall be the `on_underlying_io_send_complete` function. ]*/
                     /* Codes_SRS_UWS_01_057: [ - the `send_complete_context` argument shall identify the pending send. ]*/
-                    if (xio_send(uws->underlying_io, encoded_frame, encoded_frame_length, on_underlying_io_send_complete, ws_pending_send) != 0)
+                    if (xio_send(uws->underlying_io, encoded_frame, encoded_frame_length, on_underlying_io_send_complete, new_pending_send_list_item) != 0)
                     {
                         /* Codes_SRS_UWS_01_058: [ If `xio_send` fails, `uws_send_frame` shall fail and return a non-zero value. ]*/
                         (void)singlylinkedlist_remove(uws->pending_sends, new_pending_send_list_item);

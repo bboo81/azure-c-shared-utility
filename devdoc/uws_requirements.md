@@ -222,6 +222,9 @@ XX**SRS_UWS_01_419: [** If there is an error decoding the WebSocket frame, an er
 
 ### on_underlying_io_send_complete
 
+**SRS_UWS_01_432: [** The indicated sent frame shall be removed from the list by calling `singlylinkedlist_remove`. **]**
+**SRS_UWS_01_433: [** If `singlylinkedlist_remove` fails an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_CANNOT_REMOVE_SENT_ITEM_FROM_LIST`. **]**
+**SRS_UWS_01_434: [** The memory associated with the sent frame shall be freed. **]**
 **SRS_UWS_01_389: [** When `on_underlying_io_send_complete` is called with `IO_SEND_OK` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_OK`. **]**
 **SRS_UWS_01_390: [** When `on_underlying_io_send_complete` is called with `IO_SEND_ERROR` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_ERROR`. **]** 
 **SRS_UWS_01_391: [** When `on_underlying_io_send_complete` is called with `IO_SEND_CANCELLED` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_CANCELLED`. **]**

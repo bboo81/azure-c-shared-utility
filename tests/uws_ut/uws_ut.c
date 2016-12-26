@@ -182,6 +182,8 @@ TEST_DEFINE_ENUM_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
 IMPLEMENT_UMOCK_C_ENUM_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT_VALUES);
 TEST_DEFINE_ENUM_TYPE(WS_ERROR, WS_ERROR_VALUES);
 IMPLEMENT_UMOCK_C_ENUM_TYPE(WS_ERROR, WS_ERROR_VALUES);
+TEST_DEFINE_ENUM_TYPE(WS_SEND_FRAME_RESULT, WS_SEND_FRAME_RESULT_VALUES);
+IMPLEMENT_UMOCK_C_ENUM_TYPE(WS_SEND_FRAME_RESULT, WS_SEND_FRAME_RESULT_VALUES);
 
 static char* umocktypes_stringify_const_SOCKETIO_CONFIG_ptr(const SOCKETIO_CONFIG** value)
 {
@@ -293,10 +295,14 @@ MOCK_FUNCTION_END()
 
 static ON_IO_OPEN_COMPLETE g_on_io_open_complete;
 static void* g_on_io_open_complete_context;
+static ON_SEND_COMPLETE g_on_io_send_complete;
+static void* g_on_io_send_complete_context;
 static ON_BYTES_RECEIVED g_on_bytes_received;
 static void* g_on_bytes_received_context;
 static ON_IO_ERROR g_on_io_error;
 static void* g_on_io_error_context;
+static ON_IO_CLOSE_COMPLETE g_on_io_close_complete;
+static void* g_on_io_close_complete_context;
 
 static int my_xio_open(XIO_HANDLE xio, ON_IO_OPEN_COMPLETE on_io_open_complete, void* on_io_open_complete_context, ON_BYTES_RECEIVED on_bytes_received, void* on_bytes_received_context, ON_IO_ERROR on_io_error, void* on_io_error_context)
 {
@@ -310,14 +316,21 @@ static int my_xio_open(XIO_HANDLE xio, ON_IO_OPEN_COMPLETE on_io_open_complete, 
     return 0;
 }
 
-static ON_IO_CLOSE_COMPLETE g_on_io_close_complete;
-static void* g_on_io_close_complete_context;
-
 static int my_xio_close(XIO_HANDLE xio, ON_IO_CLOSE_COMPLETE on_io_close_complete, void* callback_context)
 {
     (void)xio;
     g_on_io_close_complete = on_io_close_complete;
     g_on_io_close_complete_context = callback_context;
+    return 0;
+}
+
+static int my_xio_send(XIO_HANDLE xio, const void* buffer, size_t size, ON_SEND_COMPLETE on_send_complete, void* callback_context)
+{
+    (void)xio;
+    (void)buffer;
+    (void)size;
+    g_on_io_send_complete = on_send_complete;
+    g_on_io_send_complete_context = callback_context;
     return 0;
 }
 
@@ -363,6 +376,7 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_GLOBAL_MOCK_HOOK(mallocAndStrcpy_s, my_mallocAndStrcpy_s);
     REGISTER_GLOBAL_MOCK_HOOK(xio_open, my_xio_open);
     REGISTER_GLOBAL_MOCK_HOOK(xio_close, my_xio_close);
+    REGISTER_GLOBAL_MOCK_HOOK(xio_send, my_xio_send);
     REGISTER_GLOBAL_MOCK_RETURN(singlylinkedlist_create, TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE);
     REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_remove, my_singlylinkedlist_remove);
     REGISTER_GLOBAL_MOCK_HOOK(singlylinkedlist_get_head_item, my_singlylinkedlist_get_head_item);
@@ -380,6 +394,7 @@ TEST_SUITE_INITIALIZE(suite_init)
     REGISTER_TYPE(IO_SEND_RESULT, IO_SEND_RESULT);
     REGISTER_TYPE(WS_OPEN_RESULT, WS_OPEN_RESULT);
     REGISTER_TYPE(WS_ERROR, WS_ERROR);
+    REGISTER_TYPE(WS_SEND_FRAME_RESULT, WS_SEND_FRAME_RESULT);
     REGISTER_TYPE(const SOCKETIO_CONFIG*, const_SOCKETIO_CONFIG_ptr);
 
     REGISTER_UMOCK_ALIAS_TYPE(SINGLYLINKEDLIST_HANDLE, void*);
@@ -3306,7 +3321,7 @@ TEST_FUNCTION(uws_send_frame_succeeds)
     STRICT_EXPECTED_CALL(BUFFER_length(IGNORED_PTR_ARG))
         .ValidateArgumentValue_handle(&buffer_handle)
         .SetReturn(sizeof(encoded_frame));
-    STRICT_EXPECTED_CALL(singlylinkedlist_add(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_NUM_ARG))
+    STRICT_EXPECTED_CALL(singlylinkedlist_add(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG))
         .IgnoreArgument_item();
     STRICT_EXPECTED_CALL(xio_send(TEST_IO_HANDLE, IGNORED_PTR_ARG, sizeof(encoded_frame), IGNORED_PTR_ARG, IGNORED_PTR_ARG))
         .IgnoreArgument_on_send_complete()
@@ -3433,7 +3448,7 @@ TEST_FUNCTION(when_xio_send_fails_uws_send_frame_fails)
     STRICT_EXPECTED_CALL(BUFFER_length(IGNORED_PTR_ARG))
         .ValidateArgumentValue_handle(&buffer_handle)
         .SetReturn(sizeof(encoded_frame));
-    STRICT_EXPECTED_CALL(singlylinkedlist_add(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_NUM_ARG))
+    STRICT_EXPECTED_CALL(singlylinkedlist_add(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG))
         .IgnoreArgument_item()
         .CaptureReturn(&new_item_handle);
     STRICT_EXPECTED_CALL(xio_send(TEST_IO_HANDLE, IGNORED_PTR_ARG, sizeof(encoded_frame), IGNORED_PTR_ARG, IGNORED_PTR_ARG))
@@ -3490,7 +3505,7 @@ TEST_FUNCTION(when_adding_the_item_to_the_list_fails_uws_send_frame_fails)
     STRICT_EXPECTED_CALL(BUFFER_length(IGNORED_PTR_ARG))
         .ValidateArgumentValue_handle(&buffer_handle)
         .SetReturn(sizeof(encoded_frame));
-    STRICT_EXPECTED_CALL(singlylinkedlist_add(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_NUM_ARG))
+    STRICT_EXPECTED_CALL(singlylinkedlist_add(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG))
         .IgnoreArgument_item()
         .SetReturn(NULL);
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
@@ -3540,7 +3555,7 @@ TEST_FUNCTION(uws_send_frame_with_NULL_complete_callback_succeeds)
     STRICT_EXPECTED_CALL(BUFFER_length(IGNORED_PTR_ARG))
         .ValidateArgumentValue_handle(&buffer_handle)
         .SetReturn(sizeof(encoded_frame));
-    STRICT_EXPECTED_CALL(singlylinkedlist_add(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_NUM_ARG))
+    STRICT_EXPECTED_CALL(singlylinkedlist_add(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG))
         .IgnoreArgument_item();
     STRICT_EXPECTED_CALL(xio_send(TEST_IO_HANDLE, IGNORED_PTR_ARG, sizeof(encoded_frame), IGNORED_PTR_ARG, IGNORED_PTR_ARG))
         .IgnoreArgument_on_send_complete()
@@ -3552,6 +3567,49 @@ TEST_FUNCTION(uws_send_frame_with_NULL_complete_callback_succeeds)
 
     // assert
     ASSERT_ARE_EQUAL(int, 0, result);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* on_underlying_io_send_complete */
+
+/* Tests_SRS_UWS_01_389: [ When `on_underlying_io_send_complete` is called with `IO_SEND_OK` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_OK`. ]*/
+/* Tests_SRS_UWS_01_432: [ The indicated sent frame shall be removed from the list by calling `singlylinkedlist_remove`. ]*/
+TEST_FUNCTION(on_underlying_io_send_complete_with_OK_indicates_the_frame_as_sent_OK)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_payload[] = { 0x42 };
+    BUFFER_HANDLE buffer_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    uws_send_frame(uws, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4245);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(singlylinkedlist_item_get_value(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(singlylinkedlist_remove(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG))
+        .IgnoreArgument_item_handle();
+    STRICT_EXPECTED_CALL(test_on_ws_send_frame_complete((void*)0x4245, WS_SEND_FRAME_OK));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    g_on_io_send_complete(g_on_io_send_complete_context, IO_SEND_OK);
+
+    // assert
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 
     // cleanup
