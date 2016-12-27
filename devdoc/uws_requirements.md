@@ -174,9 +174,9 @@ XX**SRS_UWS_01_050: [** The argument `on_ws_send_frame_complete` shall be option
 extern void uws_dowork(UWS_HANDLE uws);
 ```
 
-**SRS_UWS_01_059: [** If the `uws` argument is NULL, `uws_dowork` shall do nothing. **]**
-**SRS_UWS_01_060: [** If the IO is not yet open, `uws_dowork` shall do nothing. **]**
-**SRS_UWS_01_430: [** `uws_dowork` shall call `xio_dowork` with the IO handle argument set to the underlying IO created in `uws_create`. **]**
+XX**SRS_UWS_01_059: [** If the `uws` argument is NULL, `uws_dowork` shall do nothing. **]**
+XX**SRS_UWS_01_060: [** If the IO is not yet open, `uws_dowork` shall do nothing. **]**
+XX**SRS_UWS_01_430: [** `uws_dowork` shall call `xio_dowork` with the IO handle argument set to the underlying IO created in `uws_create`. **]**
 
 ### on_underlying_io_open_complete
 
@@ -194,8 +194,8 @@ XX**SRS_UWS_01_409: [** After any error is indicated by `on_ws_open_complete`, a
 
 ### on_underlying_io_error
 
-**SRS_UWS_01_375: [** When `on_underlying_io_error` is called while uws is OPENING, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_ERROR`. **]**
-**SRS_UWS_01_376: [** When `on_underlying_io_error` is called while the uws instance is OPEN, an error shall be reported to the user by calling the `on_ws_error` callback that was passed to `uws_open`. **]**
+XX**SRS_UWS_01_375: [** When `on_underlying_io_error` is called while uws is OPENING, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR`. **]**
+XX**SRS_UWS_01_376: [** When `on_underlying_io_error` is called while the uws instance is OPEN, an error shall be reported to the user by calling the `on_ws_error` callback that was passed to `uws_open` with the argument `WS_ERROR_UNDERLYING_IO_ERROR`. **]**
 **SRS_UWS_01_377: [** When `on_underlying_io_error` is called while the uws instance is in any other state, `on_underlying_io_error` shall do nothing. **]** 
 
 ### on_underlying_io_bytes_received
@@ -222,12 +222,14 @@ XX**SRS_UWS_01_419: [** If there is an error decoding the WebSocket frame, an er
 
 ### on_underlying_io_send_complete
 
-**SRS_UWS_01_432: [** The indicated sent frame shall be removed from the list by calling `singlylinkedlist_remove`. **]**
-**SRS_UWS_01_433: [** If `singlylinkedlist_remove` fails an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_CANNOT_REMOVE_SENT_ITEM_FROM_LIST`. **]**
-**SRS_UWS_01_434: [** The memory associated with the sent frame shall be freed. **]**
-**SRS_UWS_01_389: [** When `on_underlying_io_send_complete` is called with `IO_SEND_OK` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_OK`. **]**
-**SRS_UWS_01_390: [** When `on_underlying_io_send_complete` is called with `IO_SEND_ERROR` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_ERROR`. **]** 
-**SRS_UWS_01_391: [** When `on_underlying_io_send_complete` is called with `IO_SEND_CANCELLED` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_CANCELLED`. **]**
+XX**SRS_UWS_01_432: [** The indicated sent frame shall be removed from the list by calling `singlylinkedlist_remove`. **]**
+XX**SRS_UWS_01_433: [** If `singlylinkedlist_remove` fails an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_CANNOT_REMOVE_SENT_ITEM_FROM_LIST`. **]**
+XX**SRS_UWS_01_434: [** The memory associated with the sent frame shall be freed. **]**
+XX**SRS_UWS_01_389: [** When `on_underlying_io_send_complete` is called with `IO_SEND_OK` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_OK`. **]**
+XX**SRS_UWS_01_390: [** When `on_underlying_io_send_complete` is called with `IO_SEND_ERROR` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_ERROR`. **]** 
+XX**SRS_UWS_01_391: [** When `on_underlying_io_send_complete` is called with `IO_SEND_CANCELLED` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_CANCELLED`. **]**
+XX**SRS_UWS_01_435: [** When `on_underlying_io_send_complete` is called with a NULL `context`, it shall do nothing. **]**
+XX**SRS_UWS_01_436: [** When `on_underlying_io_send_complete` is called with any other error code, it shall indicate an error by calling the `on_ws_error` callback with `WS_ERROR_INVALID_IO_SEND_RESULT`. **]**
 
 ### RFC6455
 

@@ -3577,6 +3577,7 @@ TEST_FUNCTION(uws_send_frame_with_NULL_complete_callback_succeeds)
 
 /* Tests_SRS_UWS_01_389: [ When `on_underlying_io_send_complete` is called with `IO_SEND_OK` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_OK`. ]*/
 /* Tests_SRS_UWS_01_432: [ The indicated sent frame shall be removed from the list by calling `singlylinkedlist_remove`. ]*/
+/* Tests_SRS_UWS_01_434: [ The memory associated with the sent frame shall be freed. ]*/
 TEST_FUNCTION(on_underlying_io_send_complete_with_OK_indicates_the_frame_as_sent_OK)
 {
     // arrange
@@ -3608,6 +3609,349 @@ TEST_FUNCTION(on_underlying_io_send_complete_with_OK_indicates_the_frame_as_sent
 
     // act
     g_on_io_send_complete(g_on_io_send_complete_context, IO_SEND_OK);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_433: [ If `singlylinkedlist_remove` fails an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_CANNOT_REMOVE_SENT_ITEM_FROM_LIST`. ]*/
+TEST_FUNCTION(when_removing_the_sent_framefrom_the_list_fails_then_an_error_is_indicated)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_payload[] = { 0x42 };
+    BUFFER_HANDLE buffer_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    uws_send_frame(uws, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4245);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(singlylinkedlist_item_get_value(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(singlylinkedlist_remove(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG))
+        .IgnoreArgument_item_handle()
+        .SetReturn(1);
+    STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_CANNOT_REMOVE_SENT_ITEM_FROM_LIST));
+
+    // act
+    g_on_io_send_complete(g_on_io_send_complete_context, IO_SEND_OK);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_390: [ When `on_underlying_io_send_complete` is called with `IO_SEND_ERROR` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_ERROR`. ]*/
+TEST_FUNCTION(on_underlying_io_send_complete_with_ERROR_indicates_the_frame_with_WS_SEND_ERROR)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_payload[] = { 0x42 };
+    BUFFER_HANDLE buffer_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    uws_send_frame(uws, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4245);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(singlylinkedlist_item_get_value(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(singlylinkedlist_remove(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG))
+        .IgnoreArgument_item_handle();
+    STRICT_EXPECTED_CALL(test_on_ws_send_frame_complete((void*)0x4245, WS_SEND_FRAME_ERROR));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    g_on_io_send_complete(g_on_io_send_complete_context, IO_SEND_ERROR);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_391: [ When `on_underlying_io_send_complete` is called with `IO_SEND_CANCELLED` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_CANCELLED`. ]*/
+TEST_FUNCTION(on_underlying_io_send_complete_with_CANCELLED_indicates_the_frame_with_WS_SEND_CANCELLED)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_payload[] = { 0x42 };
+    BUFFER_HANDLE buffer_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    uws_send_frame(uws, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4245);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(singlylinkedlist_item_get_value(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(singlylinkedlist_remove(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG))
+        .IgnoreArgument_item_handle();
+    STRICT_EXPECTED_CALL(test_on_ws_send_frame_complete((void*)0x4245, WS_SEND_FRAME_CANCELLED));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    g_on_io_send_complete(g_on_io_send_complete_context, IO_SEND_CANCELLED);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_435: [ When `on_underlying_io_send_complete` is called with a NULL `context`, it shall do nothing. ]*/
+TEST_FUNCTION(on_underlying_io_send_complete_with_NULL_context_does_nothing)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_payload[] = { 0x42 };
+    BUFFER_HANDLE buffer_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    uws_send_frame(uws, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4245);
+    umock_c_reset_all_calls();
+
+    // act
+    g_on_io_send_complete(NULL, IO_SEND_CANCELLED);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_436: [ When `on_underlying_io_send_complete` is called with any other error code, it shall indicate an error by calling the `on_ws_error` callback with `WS_ERROR_INVALID_IO_SEND_RESULT`. ]*/
+TEST_FUNCTION(on_underlying_io_send_complete_with_an_unknown_result_indicates_an_error)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    unsigned char test_payload[] = { 0x42 };
+    BUFFER_HANDLE buffer_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    uws_send_frame(uws, test_payload, sizeof(test_payload), true, test_on_ws_send_frame_complete, (void*)0x4245);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(singlylinkedlist_item_get_value(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(singlylinkedlist_remove(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE, IGNORED_PTR_ARG))
+        .IgnoreArgument_item_handle();
+    STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_INVALID_IO_SEND_RESULT));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    g_on_io_send_complete(g_on_io_send_complete_context, 0x42);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* uws_dowork */
+
+/* Tests_SRS_UWS_01_059: [ If the `uws` argument is NULL, `uws_dowork` shall do nothing. ]*/
+TEST_FUNCTION(uws_dowork_with_NULL_handle_does_nothing)
+{
+    // arrange
+
+    // act
+    uws_dowork(NULL);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_430: [ `uws_dowork` shall call `xio_dowork` with the IO handle argument set to the underlying IO created in `uws_create`. ]*/
+TEST_FUNCTION(uws_dowork_calls_the_underlying_io_dowork)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(xio_dowork(TEST_IO_HANDLE));
+
+    // act
+    uws_dowork(uws);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_060: [ If the IO is not yet open, `uws_dowork` shall do nothing. ]*/
+TEST_FUNCTION(uws_dowork_when_closed_does_nothing)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    umock_c_reset_all_calls();
+
+    // act
+    uws_dowork(uws);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* on_underlying_io_error */
+
+/* Tests_SRS_UWS_01_375: [ When `on_underlying_io_error` is called while uws is OPENING, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_UNDERLYING_IO_ERROR`. ]*/
+TEST_FUNCTION(on_underlying_io_error_while_opening_underlying_io_indicates_an_open_complete_with_WS_OPEN_ERROR_UNDERLYING_IO_ERROR)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(test_on_ws_open_complete((void*)0x4242, WS_OPEN_ERROR_UNDERLYING_IO_ERROR));
+    STRICT_EXPECTED_CALL(xio_close(TEST_IO_HANDLE, NULL, NULL));
+
+    // act
+    g_on_io_error(g_on_io_error_context);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_375: [ When `on_underlying_io_error` is called while uws is OPENING, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_UNDERLYING_IO_ERROR`. ]*/
+TEST_FUNCTION(on_underlying_io_error_while_waiting_for_upgrade_response_indicates_an_open_complete_with_WS_OPEN_ERROR_UNDERLYING_IO_ERROR)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(test_on_ws_open_complete((void*)0x4242, WS_OPEN_ERROR_UNDERLYING_IO_ERROR));
+    STRICT_EXPECTED_CALL(xio_close(TEST_IO_HANDLE, NULL, NULL));
+
+    // act
+    g_on_io_error(g_on_io_error_context);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_376: [ When `on_underlying_io_error` is called while the uws instance is OPEN, an error shall be reported to the user by calling the `on_ws_error` callback that was passed to `uws_open` with the argument `WS_ERROR_UNDERLYING_IO_ERROR`. ]*/
+TEST_FUNCTION(on_underlying_io_error_while_OPEN_indicates_an_error)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(test_on_ws_error((void*)0x4244, WS_ERROR_UNDERLYING_IO_ERROR));
+
+    // act
+    g_on_io_error(g_on_io_error_context);
 
     // assert
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());

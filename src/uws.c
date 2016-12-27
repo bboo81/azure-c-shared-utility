@@ -743,7 +743,24 @@ static void on_underlying_io_close_complete(void* context)
 
 static void on_underlying_io_error(void* context)
 {
-    (void)context;
+    UWS_HANDLE uws = (UWS_HANDLE)context;
+
+    switch (uws->uws_state)
+    {
+    default:
+        break;
+
+    case UWS_STATE_OPENING_UNDERLYING_IO:
+    case UWS_STATE_WAITING_FOR_UPGRADE_RESPONSE:
+        /* Codes_SRS_UWS_01_375: [ When `on_underlying_io_error` is called while uws is OPENING, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_UNDERLYING_IO_ERROR`. ]*/
+        indicate_ws_open_complete_error_and_close(uws, WS_OPEN_ERROR_UNDERLYING_IO_ERROR);
+        break;
+
+    case UWS_STATE_OPEN:
+        /* Codes_SRS_UWS_01_376: [ When `on_underlying_io_error` is called while the uws instance is OPEN, an error shall be reported to the user by calling the `on_ws_error` callback that was passed to `uws_open` with the argument `WS_ERROR_UNDERLYING_IO_ERROR`. ]*/
+        indicate_ws_error(uws, WS_ERROR_UNDERLYING_IO_ERROR);
+        break;
+    }
 }
 
 int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, void* on_ws_open_complete_context, ON_WS_FRAME_RECEIVED on_ws_frame_received, void* on_ws_frame_received_context, ON_WS_ERROR on_ws_error, void* on_ws_error_context)
@@ -852,23 +869,52 @@ int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* o
 
 static void on_underlying_io_send_complete(void* context, IO_SEND_RESULT send_result)
 {
-    LIST_ITEM_HANDLE ws_pending_send_list_item = (LIST_ITEM_HANDLE)context;
-    WS_PENDING_SEND* ws_pending_send = (WS_PENDING_SEND*)singlylinkedlist_item_get_value(ws_pending_send_list_item);
-    UWS_HANDLE uws = ws_pending_send->uws;
-
-    singlylinkedlist_remove(uws->pending_sends, ws_pending_send_list_item);
-
-    switch (send_result)
+    if (context == NULL)
     {
-    default:
-        break;
-
-    case IO_SEND_OK:
-        ws_pending_send->on_ws_send_frame_complete(ws_pending_send->context, WS_SEND_FRAME_OK);
-        break;
+        /* Codes_SRS_UWS_01_435: [ When `on_underlying_io_send_complete` is called with a NULL `context`, it shall do nothing. ]*/
+        LogError("on_underlying_io_send_complete called with NULL context");
     }
+    else
+    {
+        LIST_ITEM_HANDLE ws_pending_send_list_item = (LIST_ITEM_HANDLE)context;
+        WS_PENDING_SEND* ws_pending_send = (WS_PENDING_SEND*)singlylinkedlist_item_get_value(ws_pending_send_list_item);
+        UWS_HANDLE uws = ws_pending_send->uws;
 
-    free(ws_pending_send);
+        /* Codes_SRS_UWS_01_432: [ The indicated sent frame shall be removed from the list by calling `singlylinkedlist_remove`. ]*/
+        if (singlylinkedlist_remove(uws->pending_sends, ws_pending_send_list_item) != 0)
+        {
+            /* Codes_SRS_UWS_01_433: [ If `singlylinkedlist_remove` fails an error shall be indicated by calling the `on_ws_error` callback with `WS_ERROR_CANNOT_REMOVE_SENT_ITEM_FROM_LIST`. ]*/
+            indicate_ws_error(uws, WS_ERROR_CANNOT_REMOVE_SENT_ITEM_FROM_LIST);
+        }
+        else
+        {
+            switch (send_result)
+            {
+            default:
+                /* Codes_SRS_UWS_01_436: [ When `on_underlying_io_send_complete` is called with any other error code, it shall indicate an error by calling the `on_ws_error` callback with `WS_ERROR_INVALID_IO_SEND_RESULT`. ]*/
+                indicate_ws_error(uws, WS_ERROR_INVALID_IO_SEND_RESULT);
+                break;
+
+            case IO_SEND_OK:
+                /* Codes_SRS_UWS_01_389: [ When `on_underlying_io_send_complete` is called with `IO_SEND_OK` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_OK`. ]*/
+                ws_pending_send->on_ws_send_frame_complete(ws_pending_send->context, WS_SEND_FRAME_OK);
+                break;
+
+            case IO_SEND_ERROR:
+                /* Codes_SRS_UWS_01_390: [ When `on_underlying_io_send_complete` is called with `IO_SEND_ERROR` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_ERROR`. ]*/
+                ws_pending_send->on_ws_send_frame_complete(ws_pending_send->context, WS_SEND_FRAME_ERROR);
+                break;
+
+            case IO_SEND_CANCELLED:
+                /* Codes_SRS_UWS_01_391: [ When `on_underlying_io_send_complete` is called with `IO_SEND_CANCELLED` as a result of sending a WebSocket frame to the underlying IO, the send shall be indicated to the uws user by calling `on_ws_send_frame_complete` with `WS_SEND_FRAME_CANCELLED`. ]*/
+                ws_pending_send->on_ws_send_frame_complete(ws_pending_send->context, WS_SEND_FRAME_CANCELLED);
+                break;
+            }
+
+            /* Codes_SRS_UWS_01_434: [ The memory associated with the sent frame shall be freed. ]*/
+            free(ws_pending_send);
+        }
+    }
 }
 
 int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, bool is_final, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* on_ws_send_frame_complete_context)
@@ -966,4 +1012,22 @@ int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, boo
     }
 
     return result;
+}
+
+void uws_dowork(UWS_HANDLE uws)
+{
+    if (uws == NULL)
+    {
+        /* Codes_SRS_UWS_01_059: [ If the `uws` argument is NULL, `uws_dowork` shall do nothing. ]*/
+        LogError("NULL uws handle.");
+    }
+    else
+    {
+        /* Codes_SRS_UWS_01_060: [ If the IO is not yet open, `uws_dowork` shall do nothing. ]*/
+        if (uws->uws_state != UWS_STATE_CLOSED)
+        {
+            /* Codes_SRS_UWS_01_430: [ `uws_dowork` shall call `xio_dowork` with the IO handle argument set to the underlying IO created in `uws_create`. ]*/
+            xio_dowork(uws->underlying_io);
+        }
+    }
 }
