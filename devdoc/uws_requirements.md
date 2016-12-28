@@ -97,8 +97,8 @@ extern void uws_destroy(UWS_HANDLE uws);
 XX**SRS_UWS_01_019: [** `uws_destroy` shall free all resources associated with the uws instance. **]**
 XX**SRS_UWS_01_020: [** If `uws` is NULL, `uws_destroy` shall do nothing. **]** 
 XX**SRS_UWS_01_424: [** `uws_destroy` shall free the buffer allocated in `uws_create` by calling `BUFFER_delete`. **]**
-**SRS_UWS_01_021: [** `uws_destroy` shall perform a close action if the uws instance has already been open. **]**
-**SRS_UWS_01_022: [** `uws_destroy` shall execute a close action if an open is in progress. **]**
+XX**SRS_UWS_01_021: [** `uws_destroy` shall perform a close action if the uws instance has already been open. **]**
+**SRS_UWS_01_022: [** `uws_destroy` shall execute a close action if an open is in progress and trigger the `on_ws_open_complete` callback with `WS_OPEN_CANCELLED`. **]**
 XX**SRS_UWS_01_023: [** `uws_destroy` shall destroy the underlying IO created in `uws_create` by calling `xio_destroy`. **]**
 XX**SRS_UWS_01_024: [** `uws_destroy` shall free the list used to track the pending sends by calling `singlylinkedlist_destroy`. **]**
 XX**SRS_UWS_01_437: [** `uws_destroy` shall free the protocols array allocated in `uws_create`. **]**
@@ -128,7 +128,7 @@ XX**SRS_UWS_01_396: [** On success `uws_close` shall return 0. **]**
 XX**SRS_UWS_01_030: [** if `uws` is NULL, `uws_close` shall return a non-zero value. **]**
 XX**SRS_UWS_01_399: [** `on_ws_close_complete` and `on_ws_close_complete_context` shall be saved and the callback `on_ws_close_complete` shall be triggered when the close is complete. **]** 
 XX**SRS_UWS_01_397: [** The `on_ws_close_complete` argument shall be allowed to be NULL, in which case no callback shall be called when the close is complete. **]**
-XX**SRS_UWS_01_398: [** `on_ws_close_complete_context` shall also be allows to be NULL. **]**
+XX**SRS_UWS_01_398: [** `on_ws_close_complete_context` shall also be allowed to be NULL. **]**
 XX**SRS_UWS_01_031: [** `uws_close` shall close the connection by calling `xio_close` while passing as argument the IO handle created in `uws_create`. **]**
 XX**SRS_UWS_01_368: [** The callback `on_underlying_io_close` shall be passed as argument to `xio_close`. **]**
 XX**SRS_UWS_01_395: [** If `xio_close` fails, `uws_close` shall fail and return a non-zero value. **]**
@@ -678,7 +678,7 @@ XX**SRS_UWS_01_436: [** When `on_underlying_io_send_complete` is called with any
 
       **SRS_UWS_01_156: [** *  %x8 denotes a connection close **]**
 
-      **SRS_UWS_01_157: [** *  %x9 denotes a ping **]**
+      XX**SRS_UWS_01_157: [** *  %x9 denotes a ping **]**
 
       **SRS_UWS_01_158: [** *  %xA denotes a pong **]**
 
@@ -940,8 +940,8 @@ XX**SRS_UWS_01_436: [** When `on_underlying_io_send_complete` is called with any
 
    **SRS_UWS_01_248: [** A Ping frame MAY include "Application data". **]**
 
-   **SRS_UWS_01_249: [** Upon receipt of a Ping frame, an endpoint MUST send a Pong frame in response, unless it already received a Close frame. **]**
-   **SRS_UWS_01_250: [** It SHOULD respond with Pong frame as soon as is practical. **]**
+   XX**SRS_UWS_01_249: [** Upon receipt of a Ping frame, an endpoint MUST send a Pong frame in response **]**, **SRS_UWS_01_438: [** unless it already received a Close frame. **]**
+   XX**SRS_UWS_01_250: [** It SHOULD respond with Pong frame as soon as is practical. **]**
    Pong frames are discussed in Section 5.5.3.
 
    **SRS_UWS_01_251: [** An endpoint MAY send a Ping frame any time after the connection is established and before the connection is closed. **]**
@@ -954,7 +954,7 @@ XX**SRS_UWS_01_436: [** When `on_underlying_io_send_complete` is called with any
 
    Section 5.5.2 details requirements that apply to both Ping and Pong frames.
 
-   **SRS_UWS_01_253: [** A Pong frame sent in response to a Ping frame must have identical "Application data" as found in the message body of the Ping frame being replied to. **]**
+   XX**SRS_UWS_01_253: [** A Pong frame sent in response to a Ping frame must have identical "Application data" as found in the message body of the Ping frame being replied to. **]**
 
    **SRS_UWS_01_254: [** If an endpoint receives a Ping frame and has not yet sent Pong frame(s) in response to previous Ping frame(s), the endpoint MAY elect to send a Pong frame for only the most recently processed Ping frame. **]**
 

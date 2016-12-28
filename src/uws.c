@@ -48,10 +48,6 @@ typedef struct WS_PENDING_SEND_TAG
     UWS_HANDLE uws;
 } WS_PENDING_SEND;
 
-#define OPCODE_CONTINUATION_FRAME   0x0
-#define OPCODE_TEXT_FRAME           0x1
-#define OPCODE_BINARY_FRAME         0x2
-
 typedef struct UWS_INSTANCE_TAG
 {
     SINGLYLINKEDLIST_HANDLE pending_sends;
@@ -323,10 +319,22 @@ void uws_destroy(UWS_HANDLE uws)
     }
     else
     {
-        size_t i;
+        /* Codes_SRS_UWS_01_021: [ `uws_destroy` shall perform a close action if the uws instance has already been open. ]*/
+        switch (uws->uws_state)
+        {
+        default:
+            break;
+
+        case UWS_STATE_OPEN:
+        case UWS_STATE_ERROR:
+            uws_close(uws, NULL, NULL);
+            break;
+        }
 
         if (uws->protocol_count > 0)
         {
+            size_t i;
+
             /* Codes_SRS_UWS_01_437: [ `uws_destroy` shall free the protocols array allocated in `uws_create`. ]*/
             for (i = 0; i < uws->protocol_count; i++)
             {
@@ -713,7 +721,7 @@ static void on_underlying_io_bytes_received(void* context, const unsigned char* 
                                 break;
 
                                 /* Codes_SRS_UWS_01_153: [ *  %x1 denotes a text frame ]*/
-                            case OPCODE_TEXT_FRAME:
+                            case (unsigned char)WS_TEXT_FRAME:
                                 /* Codes_SRS_UWS_01_386: [ When a WebSocket data frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. ]*/
                                 /* Codes_SRS_UWS_01_169: [ The payload length is the length of the "Extension data" + the length of the "Application data". ]*/
                                 /* Codes_SRS_UWS_01_173: [ The "Payload data" is defined as "Extension data" concatenated with "Application data". ]*/
@@ -722,13 +730,40 @@ static void on_underlying_io_bytes_received(void* context, const unsigned char* 
                                 break;
 
                                 /* Codes_SRS_UWS_01_154: [ *  %x2 denotes a binary frame ]*/
-                            case OPCODE_BINARY_FRAME:
+                            case (unsigned char)WS_BINARY_FRAME:
                                 /* Codes_SRS_UWS_01_386: [ When a WebSocket data frame is decoded succesfully it shall be indicated via the callback `on_ws_frame_received`. ]*/
                                 /* Codes_SRS_UWS_01_169: [ The payload length is the length of the "Extension data" + the length of the "Application data". ]*/
                                 /* Codes_SRS_UWS_01_173: [ The "Payload data" is defined as "Extension data" concatenated with "Application data". ]*/
                                 uws->on_ws_frame_received(uws->on_ws_frame_received_context, WS_FRAME_TYPE_BINARY, uws->received_bytes + needed_bytes - length, length);
                                 decode_stream = 1;
                                 break;
+
+                                /* Codes_SRS_UWS_01_157: [ *  %x9 denotes a ping ]*/
+                            case (unsigned char)WS_PING_FRAME:
+                            {
+                                /* Codes_SRS_UWS_01_249: [ Upon receipt of a Ping frame, an endpoint MUST send a Pong frame in response ]*/
+                                /* Codes_SRS_UWS_01_250: [ It SHOULD respond with Pong frame as soon as is practical. ]*/
+                                unsigned char* pong_frame;
+                                size_t pong_frame_length;
+
+                                uws->uws_state = UWS_STATE_ERROR;
+
+                                if (uws_frame_encoder_encode(uws->encode_buffer, WS_PONG_FRAME, uws->received_bytes + needed_bytes - length, length, true, true, 0) != 0)
+                                {
+                                    LogError("Encoding of PONG failed.");
+                                }
+                                else
+                                {
+                                    pong_frame = BUFFER_u_char(uws->encode_buffer);
+                                    pong_frame_length = BUFFER_length(uws->encode_buffer);
+                                    if (xio_send(uws->underlying_io, pong_frame, pong_frame_length, NULL, NULL) != 0)
+                                    {
+                                        LogError("Sending CLOSE frame failed.");
+                                    }
+                                }
+
+                                break;
+                            }
                             }
 
                             consume_received_bytes(uws, needed_bytes);
@@ -857,7 +892,7 @@ int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* o
 
             /* Codes_SRS_UWS_01_031: [ `uws_close` shall close the connection by calling `xio_close` while passing as argument the IO handle created in `uws_create`. ]*/
             /* Codes_SRS_UWS_01_368: [ The callback `on_underlying_io_close` shall be passed as argument to `xio_close`. ]*/
-            if (xio_close(uws->underlying_io, on_underlying_io_close_complete, uws) != 0)
+            if (xio_close(uws->underlying_io, (on_ws_close_complete == NULL) ? NULL :  on_underlying_io_close_complete, (on_ws_close_complete == NULL) ? NULL : uws) != 0)
             {
                 /* Codes_SRS_UWS_01_395: [ If `xio_close` fails, `uws_close` shall fail and return a non-zero value. ]*/
                 LogError("Closing the underlying IO failed.");

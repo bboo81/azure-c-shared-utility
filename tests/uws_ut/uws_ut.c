@@ -1194,6 +1194,39 @@ TEST_FUNCTION(uws_destroy_with_NULL_does_nothing)
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 }
 
+/* Tests_SRS_UWS_01_021: [ `uws_destroy` shall perform a close action if the uws instance has already been open. ]*/
+TEST_FUNCTION(uws_destroy_also_performs_a_close)
+{
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response));
+    umock_c_reset_all_calls();
+
+    STRICT_EXPECTED_CALL(xio_close(TEST_IO_HANDLE, NULL, NULL));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(xio_destroy(TEST_IO_HANDLE));
+    STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(BUFFER_delete(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    
+    // act
+    uws_destroy(uws);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
 /* uws_open */
 
 /* Tests_SRS_UWS_01_025: [ `uws_open` shall open the underlying IO by calling `xio_open` and providing the IO handle created in `uws_create` as argument. ]*/
@@ -4145,6 +4178,96 @@ TEST_FUNCTION(on_underlying_io_error_while_OPEN_indicates_an_error)
 
     // act
     g_on_io_error(g_on_io_error_context);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Ping frame */
+
+/* Tests_SRS_UWS_01_157: [ *  %x9 denotes a ping ]*/
+/* Tests_SRS_UWS_01_249: [ Upon receipt of a Ping frame, an endpoint MUST send a Pong frame in response ]*/
+/* Tests_SRS_UWS_01_250: [ It SHOULD respond with Pong frame as soon as is practical. ]*/
+/* Tests_SRS_UWS_01_253: [ A Pong frame sent in response to a Ping frame must have identical "Application data" as found in the message body of the Ping frame being replied to. ]*/
+TEST_FUNCTION(when_a_PING_frame_was_received_a_PONG_frame_is_sent)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    const unsigned char ping_frame[] = { 0x89, 0x00 };
+    unsigned char pong_frame[] = { 0x8A, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    BUFFER_HANDLE buffer_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(uws_frame_encoder_encode(buffer_handle, WS_PONG_FRAME, IGNORED_PTR_ARG, 0, true, true, 0))
+        .IgnoreArgument_payload();
+    STRICT_EXPECTED_CALL(BUFFER_u_char(buffer_handle)).SetReturn(pong_frame);
+    STRICT_EXPECTED_CALL(BUFFER_length(buffer_handle)).SetReturn(sizeof(pong_frame));
+    STRICT_EXPECTED_CALL(xio_send(TEST_IO_HANDLE, pong_frame, sizeof(pong_frame), NULL, NULL))
+        .ValidateArgumentBuffer(2, pong_frame, sizeof(pong_frame));
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)ping_frame, sizeof(ping_frame));
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+
+    // cleanup
+    uws_destroy(uws);
+}
+
+/* Tests_SRS_UWS_01_253: [ A Pong frame sent in response to a Ping frame must have identical "Application data" as found in the message body of the Ping frame being replied to. ]*/
+TEST_FUNCTION(when_a_PING_frame_was_received_with_some_payload_a_PONG_frame_is_sent_with_the_Same_payload)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    const char test_upgrade_response[] = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
+    const unsigned char ping_frame[] = { 0x89, 0x02, 0x42, 0x43 };
+    unsigned char pong_frame_payload[] = { 0x42, 0x43 };
+    unsigned char pong_frame[] = { 0x8A, 0x02, 0x00, 0x00, 0x00, 0x00, 0x42, 0x43 };
+    BUFFER_HANDLE buffer_handle;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+
+    uws = uws_create("test_host", 444, "/aaa", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
+    (void)uws_open(uws, test_on_ws_open_complete, (void*)0x4242, test_on_ws_frame_received, (void*)0x4243, test_on_ws_error, (void*)0x4244);
+    g_on_io_open_complete(g_on_io_open_complete_context, IO_OPEN_OK);
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)test_upgrade_response, sizeof(test_upgrade_response) - 1);
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_realloc(IGNORED_PTR_ARG, IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(uws_frame_encoder_encode(buffer_handle, WS_PONG_FRAME, pong_frame_payload, sizeof(pong_frame_payload), true, true, 0))
+        .ValidateArgumentBuffer(3, pong_frame_payload, sizeof(pong_frame_payload));
+    STRICT_EXPECTED_CALL(BUFFER_u_char(buffer_handle)).SetReturn(pong_frame);
+    STRICT_EXPECTED_CALL(BUFFER_length(buffer_handle)).SetReturn(sizeof(pong_frame));
+    STRICT_EXPECTED_CALL(xio_send(TEST_IO_HANDLE, pong_frame, sizeof(pong_frame), NULL, NULL))
+        .ValidateArgumentBuffer(2, pong_frame, sizeof(pong_frame));
+
+    // act
+    g_on_bytes_received(g_on_bytes_received_context, (const unsigned char*)ping_frame, sizeof(ping_frame));
 
     // assert
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
