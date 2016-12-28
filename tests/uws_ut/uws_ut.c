@@ -18,6 +18,12 @@
 - Check the Websocket Upgrade request by breaking it into lines and parsing each line. Test on_underlying_io_open_complete_with_OK_prepares_and_sends_the_WebSocket_upgrade_request
 */
 
+/* Requirements not needed as they are optional:
+Tests_SRS_UWS_01_254: [ If an endpoint receives a Ping frame and has not yet sent Pong frame(s) in response to previous Ping frame(s), the endpoint MAY elect to send a Pong frame for only the most recently processed Ping frame. ]
+Tests_SRS_UWS_01_255: [ A Pong frame MAY be sent unsolicited. ]
+Tests_SRS_UWS_01_256: [ A response to an unsolicited Pong frame is not expected. ]
+*/
+
 #define ENABLE_MOCKS
 
 #include "azure_c_shared_utility/xio.h"

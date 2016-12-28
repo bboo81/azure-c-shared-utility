@@ -17,6 +17,7 @@
 #include "azure_c_shared_utility/xio.h"
 #include "azure_c_shared_utility/shared_util_options.h"
 #include "azure_c_shared_utility/crt_abstractions.h"
+#include "azure_c_shared_utility/uws.h"
 
 typedef enum IO_STATE_TAG
 {
@@ -50,9 +51,7 @@ typedef struct WSIO_INSTANCE_TAG
     char* hostname;
     char* proxy_address;
     int proxy_port;
-    XIO_HANDLE underlying_io;
-    size_t received_byte_count;
-    unsigned char* received_bytes;
+    UWS_HANDLE uws;
 } WSIO_INSTANCE;
 
 static void indicate_error(WSIO_INSTANCE* wsio_instance)
@@ -131,6 +130,12 @@ static int remove_pending_io(WSIO_INSTANCE* wsio_instance, LIST_ITEM_HANDLE item
     return result;
 }
 
+static void on_underlying_ws_send_frame_complete(void* context, WS_SEND_FRAME_RESULT ws_send_frame_result)
+{
+    (void)context;
+    (void)ws_send_frame_result;
+}
+
 static void send_pending_ios(WSIO_INSTANCE* wsio_instance)
 {
     LIST_ITEM_HANDLE first_pending_io;
@@ -146,461 +151,12 @@ static void send_pending_ios(WSIO_INSTANCE* wsio_instance)
         }
         else
         {
-            bool is_partially_sent = pending_socket_io->is_partially_sent;
-            size_t frame_length = 6;
-            if (pending_socket_io->size > 125)
+            if (uws_send_frame(wsio_instance->uws, pending_socket_io->bytes, pending_socket_io->size, true, on_underlying_ws_send_frame_complete, first_pending_io) != 0)
             {
-                frame_length += 2;
-            }
-            if (pending_socket_io->size > 65535)
-            {
-                frame_length += 6;
-            }
-
-            frame_length += pending_socket_io->size;
-
-            unsigned char* ws_buffer = (unsigned char*)malloc(frame_length * 2);
-            if (ws_buffer == NULL)
-            {
-                if (pending_socket_io->on_send_complete != NULL)
-                {
-                    pending_socket_io->on_send_complete(pending_socket_io->callback_context, IO_SEND_ERROR);
-                }
-
-                if (is_partially_sent)
-                {
-                    indicate_error(wsio_instance);
-                }
-                else
-                {
-                    if (singlylinkedlist_get_head_item(wsio_instance->pending_io_list) != NULL)
-                    {
-                        /* continue ... */
-                    }
-                }
-
-                if ((remove_pending_io(wsio_instance, first_pending_io, pending_socket_io) != 0) && !is_partially_sent)
-                {
-                    indicate_error(wsio_instance);
-                }
+                indicate_error(wsio_instance);
             }
             else
             {
-                /* fill in frame */
-                size_t pos = 0;
-
-                ws_buffer[0] = (1 << 7) +
-                    2;
-                ws_buffer[1] = (1 << 7);
-                if (pending_socket_io->size < 126)
-                {
-                    ws_buffer[1] |= pending_socket_io->size;
-                    pos = 2;
-                }
-                else if (pending_socket_io->size < 65536)
-                {
-                    ws_buffer[1] |= 126;
-                    ws_buffer[2] = (unsigned char)(pending_socket_io->size >> 8);
-                    ws_buffer[3] = (unsigned char)(pending_socket_io->size & 0xFF);
-                    pos = 4;
-                }
-                else
-                {
-                    ws_buffer[1] |= 127;
-                    ws_buffer[2] = ((uint64_t)pending_socket_io->size >> 56) & 0xFF;
-                    ws_buffer[3] = ((uint64_t)pending_socket_io->size >> 48) & 0xFF;
-                    ws_buffer[4] = ((uint64_t)pending_socket_io->size >> 40) & 0xFF;
-                    ws_buffer[5] = ((uint64_t)pending_socket_io->size >> 32) & 0xFF;
-                    ws_buffer[6] = ((uint64_t)pending_socket_io->size >> 24) & 0xFF;
-                    ws_buffer[7] = ((uint64_t)pending_socket_io->size >> 16) & 0xFF;
-                    ws_buffer[8] = ((uint64_t)pending_socket_io->size >> 8) & 0xFF;
-                    ws_buffer[9] = ((uint64_t)pending_socket_io->size & 0xFF);
-                    pos = 10;
-                }
-
-                /* mask key */
-                ws_buffer[pos++] = 0x00;
-                ws_buffer[pos++] = 0x00;
-                ws_buffer[pos++] = 0x00;
-                ws_buffer[pos++] = 0x00;
-
-/*                ws_buffer[0] = 0x82;
-                ws_buffer[1] = 0x8E;
-                ws_buffer[2] = 0x00;
-                ws_buffer[3] = 0x08;
-                //ws_buffer[0] = 1 + (2 << 4);
-                //ws_buffer[1] = 1 + (126 << 1);
-                ws_buffer[4] = 0x00;
-                ws_buffer[5] = 0x00;
-                ws_buffer[6] = 0x00;
-                ws_buffer[7] = 0x00;
-                pos = 8;*/
-
-                (void)memcpy(ws_buffer + pos, pending_socket_io->bytes, pending_socket_io->size);
-                pos += pending_socket_io->size;
-
-                /*unsigned char fake_one[] =
-                { 0x82, 0x88, 0xb3, 0xa6, 0xdb, 0x3c, 0xf2, 0xeb, 0x8a, 0x6c, 0xb0, 0xa7, 0xdb, 0x3c };*/
-
-                /*unsigned char fake_one[] = 
-                {
-                    0x82,
-                    0xFE,
-                    0x0,
-                    0x0,
-                    0x0,
-                    0x0,
-                    0x0,
-                    0x0,
-                    0x41,
-                    0x4D,
-                    0x51,
-                    0x50,
-                    0x3,
-                    0x1,
-                    0x0,
-                    0x0,
-                    0x0,
-                    0x0,
-                    0x1,
-                    0x44,
-                    0x2,
-                    0x1,
-                    0x0,
-                    0x0,
-                    0x0,
-                    0x53,
-                    0x41,
-                    0xD0,
-                    0x0,
-                    0x0,
-                    0x1,
-                    0x34,
-                    0x0,
-                    0x0,
-                    0x0,
-                    0x2,
-                    0xA3,
-                    0x5,
-                    0x50,
-                    0x4C,
-                    0x41,
-                    0x49,
-                    0x4E,
-                    0xB0,
-                    0x0,
-                    0x0,
-                    0x1,
-                    0x24,
-                    0x0,
-                    0x6A,
-                    0x61,
-                    0x76,
-                    0x61,
-                    0x2D,
-                    0x64,
-                    0x65,
-                    0x76,
-                    0x69,
-                    0x63,
-                    0x65,
-                    0x2D,
-                    0x63,
-                    0x6C,
-                    0x69,
-                    0x65,
-                    0x6E,
-                    0x74,
-                    0x2D,
-                    0x65,
-                    0x32,
-                    0x65,
-                    0x2D,
-                    0x74,
-                    0x65,
-                    0x73,
-                    0x74,
-                    0x2D,
-                    0x61,
-                    0x6D,
-                    0x71,
-                    0x70,
-                    0x73,
-                    0x2D,
-                    0x62,
-                    0x34,
-                    0x39,
-                    0x39,
-                    0x63,
-                    0x34,
-                    0x36,
-                    0x64,
-                    0x2D,
-                    0x31,
-                    0x66,
-                    0x38,
-                    0x30,
-                    0x2D,
-                    0x34,
-                    0x35,
-                    0x33,
-                    0x39,
-                    0x2D,
-                    0x39,
-                    0x36,
-                    0x31,
-                    0x65,
-                    0x2D,
-                    0x31,
-                    0x62,
-                    0x32,
-                    0x36,
-                    0x30,
-                    0x35,
-                    0x64,
-                    0x34,
-                    0x34,
-                    0x35,
-                    0x38,
-                    0x38,
-                    0x40,
-                    0x73,
-                    0x61,
-                    0x73,
-                    0x2E,
-                    0x69,
-                    0x6F,
-                    0x74,
-                    0x2D,
-                    0x73,
-                    0x64,
-                    0x6B,
-                    0x73,
-                    0x2D,
-                    0x74,
-                    0x65,
-                    0x73,
-                    0x74,
-                    0x0,
-                    0x53,
-                    0x68,
-                    0x61,
-                    0x72,
-                    0x65,
-                    0x64,
-                    0x41,
-                    0x63,
-                    0x63,
-                    0x65,
-                    0x73,
-                    0x73,
-                    0x53,
-                    0x69,
-                    0x67,
-                    0x6E,
-                    0x61,
-                    0x74,
-                    0x75,
-                    0x72,
-                    0x65,
-                    0x20,
-                    0x73,
-                    0x69,
-                    0x67,
-                    0x3D,
-                    0x77,
-                    0x65,
-                    0x53,
-                    0x54,
-                    0x36,
-                    0x31,
-                    0x25,
-                    0x32,
-                    0x42,
-                    0x31,
-                    0x55,
-                    0x6A,
-                    0x48,
-                    0x71,
-                    0x50,
-                    0x41,
-                    0x38,
-                    0x5A,
-                    0x49,
-                    0x4F,
-                    0x72,
-                    0x32,
-                    0x70,
-                    0x56,
-                    0x73,
-                    0x44,
-                    0x52,
-                    0x57,
-                    0x74,
-                    0x74,
-                    0x4D,
-                    0x51,
-                    0x41,
-                    0x61,
-                    0x76,
-                    0x4A,
-                    0x76,
-                    0x57,
-                    0x52,
-                    0x5A,
-                    0x4D,
-                    0x64,
-                    0x6A,
-                    0x33,
-                    0x30,
-                    0x25,
-                    0x33,
-                    0x44,
-                    0x26,
-                    0x73,
-                    0x65,
-                    0x3D,
-                    0x31,
-                    0x34,
-                    0x37,
-                    0x34,
-                    0x34,
-                    0x39,
-                    0x32,
-                    0x37,
-                    0x32,
-                    0x31,
-                    0x26,
-                    0x73,
-                    0x72,
-                    0x3D,
-                    0x69,
-                    0x6F,
-                    0x74,
-                    0x2D,
-                    0x73,
-                    0x64,
-                    0x6B,
-                    0x73,
-                    0x2D,
-                    0x74,
-                    0x65,
-                    0x73,
-                    0x74,
-                    0x2E,
-                    0x61,
-                    0x7A,
-                    0x75,
-                    0x72,
-                    0x65,
-                    0x2D,
-                    0x64,
-                    0x65,
-                    0x76,
-                    0x69,
-                    0x63,
-                    0x65,
-                    0x73,
-                    0x2E,
-                    0x6E,
-                    0x65,
-                    0x74,
-                    0x2F,
-                    0x64,
-                    0x65,
-                    0x76,
-                    0x69,
-                    0x63,
-                    0x65,
-                    0x73,
-                    0x2F,
-                    0x6A,
-                    0x61,
-                    0x76,
-                    0x61,
-                    0x2D,
-                    0x64,
-                    0x65,
-                    0x76,
-                    0x69,
-                    0x63,
-                    0x65,
-                    0x2D,
-                    0x63,
-                    0x6C,
-                    0x69,
-                    0x65,
-                    0x6E,
-                    0x74,
-                    0x2D,
-                    0x65,
-                    0x32,
-                    0x65,
-                    0x2D,
-                    0x74,
-                    0x65,
-                    0x73,
-                    0x74,
-                    0x2D,
-                    0x61,
-                    0x6D,
-                    0x71,
-                    0x70,
-                    0x73,
-                    0x2D,
-                    0x62,
-                    0x34,
-                    0x39,
-                    0x39,
-                    0x63,
-                    0x34,
-                    0x36,
-                    0x64,
-                    0x2D,
-                    0x31,
-                    0x66,
-                    0x38,
-                    0x30,
-                    0x2D,
-                    0x34,
-                    0x35,
-                    0x33,
-                    0x39,
-                    0x2D,
-                    0x39,
-                    0x36,
-                    0x31,
-                    0x65,
-                    0x2D,
-                    0x31,
-                    0x62,
-                    0x32,
-                    0x36,
-                    0x30,
-                    0x35,
-                    0x64,
-                    0x34,
-                    0x34,
-                    0x35,
-                    0x38,
-                    0x38
-                };*/
-
-                //if (xio_send(wsio_instance->underlying_io, fake_one, sizeof(fake_one), pending_socket_io->on_send_complete, pending_socket_io->callback_context) != 0)
-                if (xio_send(wsio_instance->underlying_io, ws_buffer, pos, pending_socket_io->on_send_complete, pending_socket_io->callback_context) != 0)
-                {
-                    indicate_error(wsio_instance);
-                }
-                else
-                {
-                    LogInfo("sent");
-                    if (remove_pending_io(wsio_instance, first_pending_io, pending_socket_io) != 0)
-                    {
-                        indicate_error(wsio_instance);
-                    }
-                }
-
-                free(ws_buffer);
             }
         }
     }
@@ -622,6 +178,7 @@ CONCRETE_IO_HANDLE wsio_create(void* io_create_parameters)
         if (result != NULL)
         {
             size_t hostname_length;
+            static const WS_PROTOCOL protocols[] = { { "AMQPWSB10" } };
 
             result->on_bytes_received = NULL;
             result->on_bytes_received_context = NULL;
@@ -631,9 +188,7 @@ CONCRETE_IO_HANDLE wsio_create(void* io_create_parameters)
             result->on_io_error_context = NULL;
             result->proxy_address = NULL;
             result->proxy_port = 0;
-            result->received_bytes = NULL;
-            result->received_byte_count = 0;
-            result->underlying_io = ws_io_config->underlying_io;
+            result->uws = uws_create(ws_io_config->hostname, 443, "/$iothub/websocket", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
 
             hostname_length = strlen(ws_io_config->hostname);
             result->hostname = malloc(hostname_length + 1);
@@ -664,183 +219,28 @@ CONCRETE_IO_HANDLE wsio_create(void* io_create_parameters)
     return result;
 }
 
-static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_result)
+static void on_underlying_ws_open_complete(void* context, WS_OPEN_RESULT open_result)
 {
     WSIO_INSTANCE* wsio_instance = (WSIO_INSTANCE*)context;
-    (void)context, open_result;
-    const char upgrade_request_format[] = "GET /$iothub/websocket HTTP/1.1\r\n"
-        "Host: %s:443\r\n"
-        "Upgrade: websocket\r\n"
-        "Connection: Upgrade\r\n"
-        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
-        "Sec-WebSocket-Protocol: AMQPWSB10\r\n"
-        "Sec-WebSocket-Version: 13\r\n"
-        "\r\n";
 
-    char upgrade_request[2048];
-    size_t len = sprintf(upgrade_request, upgrade_request_format, wsio_instance->hostname);
-
-    if (xio_send(wsio_instance->underlying_io, upgrade_request, len, NULL, NULL) != 0)
-    {
-        LogError("Error sending upgrade request");
-    }
+    (void)open_result;
+    wsio_instance->io_state = IO_STATE_OPEN;
 }
 
-static void on_underlying_io_bytes_received(void* context, const unsigned char* buffer, size_t size)
+static void on_underlying_ws_frame_received(void* context, unsigned char frame_type, const unsigned char* buffer, size_t size)
 {
     WSIO_INSTANCE* wsio_instance = (WSIO_INSTANCE*)context;
 
-    (void)buffer, size;
+    (void)frame_type;
     LogInfo("Received %zu bytes", size);
 
-    unsigned char* new_received_bytes = (unsigned char*)realloc(wsio_instance->received_bytes, wsio_instance->received_byte_count + size);
-    if (new_received_bytes == NULL)
-    {
-        /* error */
-    }
-    else
-    {
-
-        wsio_instance->received_bytes = new_received_bytes;
-        (void)memcpy(wsio_instance->received_bytes + wsio_instance->received_byte_count, buffer, size);
-        wsio_instance->received_byte_count += size;
-
-        if (wsio_instance->io_state == IO_STATE_OPENING)
-        {
-            size_t pos = 0;
-            size_t last_pos = 0;
-            unsigned char done = 0;
-
-            while (done == 0)
-            {
-                /* parse the Upgrade */
-                while ((pos < wsio_instance->received_byte_count) &&
-                    (wsio_instance->received_bytes[pos] != '\r'))
-                {
-                    pos++;
-                }
-
-                if (pos == wsio_instance->received_byte_count)
-                {
-                    break;
-                }
-
-                if (pos - last_pos == 0)
-                {
-                    pos++;
-                    while ((pos < wsio_instance->received_byte_count) &&
-                        (wsio_instance->received_bytes[pos] == '\n'))
-                    {
-                        pos++;
-                    }
-
-                    done = 1;
-                }
-                else
-                {
-                    pos++;
-
-                    while ((pos < wsio_instance->received_byte_count) &&
-                        (wsio_instance->received_bytes[pos] == '\n'))
-                    {
-                        pos++;
-                    }
-
-                    if (pos == wsio_instance->received_byte_count)
-                    {
-                        break;
-                    }
-
-                    last_pos = pos;
-                }
-            }
-
-            if (done)
-            {
-                /* parsed the upgrade response ... we assume */
-                LogInfo("Got WS upgrade response");
-                wsio_instance->io_state = IO_STATE_OPEN;
-                if (wsio_instance->received_byte_count - pos > 0)
-                {
-                    memmove(wsio_instance->received_bytes, wsio_instance->received_bytes + pos, wsio_instance->received_byte_count - pos);
-                }
-                wsio_instance->received_byte_count -= pos;
-                indicate_open_complete(wsio_instance, IO_OPEN_OK);
-            }
-        }
-        else if (wsio_instance->io_state == IO_STATE_OPEN)
-        {
-            size_t needed_bytes;
-
-            if (wsio_instance->received_byte_count > 0)
-            {
-                /* parse each frame */
-                LogInfo("Got a frame?");
-
-                needed_bytes = 2;
-                if (wsio_instance->received_byte_count >= needed_bytes)
-                {
-                    unsigned char frame_type = wsio_instance->received_bytes[0] & 0xF;
-                    uint64_t payload_len = wsio_instance->received_bytes[1] & 0x7F;
-                    if (payload_len == 126)
-                    {
-                        needed_bytes += 2;
-                        if (wsio_instance->received_byte_count >= needed_bytes)
-                        {
-                            payload_len = wsio_instance->received_bytes[3];
-                            payload_len += wsio_instance->received_bytes[2] << 8;
-                            needed_bytes += (size_t)payload_len;
-                        }
-                    }
-                    else if (payload_len == 126)
-                    {
-                        needed_bytes += 8;
-                        if (wsio_instance->received_byte_count >= needed_bytes)
-                        {
-                            payload_len = (uint64_t)wsio_instance->received_bytes[2] << 56;
-                            payload_len += (uint64_t)wsio_instance->received_bytes[3] << 48;
-                            payload_len += (uint64_t)wsio_instance->received_bytes[4] << 40;
-                            payload_len += (uint64_t)wsio_instance->received_bytes[5] << 32;
-                            payload_len += (uint64_t)wsio_instance->received_bytes[6] << 24;
-                            payload_len += (uint64_t)wsio_instance->received_bytes[7] << 16;
-                            payload_len += (uint64_t)wsio_instance->received_bytes[8] << 8;
-                            payload_len += (uint64_t)wsio_instance->received_bytes[9];
-                            needed_bytes += (size_t)payload_len;
-                        }
-                    }
-                    else
-                    {
-                        needed_bytes += (size_t)payload_len;
-                    }
-
-                    if ((wsio_instance->received_bytes[1] & 0x80) != 0)
-                    {
-                        needed_bytes += 4;
-                    }
-
-                    if (wsio_instance->received_byte_count >= needed_bytes)
-                    {
-                        /* got the frame */
-                        if (frame_type == 0x2)
-                        {
-                            wsio_instance->on_bytes_received(wsio_instance->on_bytes_received_context, wsio_instance->received_bytes + needed_bytes - payload_len, (size_t)payload_len);
-                        }
-
-                        if (wsio_instance->received_byte_count > needed_bytes)
-                        {
-                            memmove(wsio_instance->received_bytes, wsio_instance->received_bytes + needed_bytes, wsio_instance->received_byte_count - needed_bytes);
-                        }
-                        wsio_instance->received_byte_count -= needed_bytes;
-                    }
-                }
-            }
-        }
-    }
+    wsio_instance->on_bytes_received(wsio_instance->on_bytes_received_context, buffer, size);
 }
 
-static void on_underlying_io_error(void* context)
+static void on_underlying_ws_error(void* context, WS_ERROR ws_error)
 {
     (void)context;
+    (void)ws_error;
 }
 
 int wsio_open(CONCRETE_IO_HANDLE ws_io, ON_IO_OPEN_COMPLETE on_io_open_complete, void* on_io_open_complete_context, ON_BYTES_RECEIVED on_bytes_received, void* on_bytes_received_context, ON_IO_ERROR on_io_error, void* on_io_error_context)
@@ -871,7 +271,7 @@ int wsio_open(CONCRETE_IO_HANDLE ws_io, ON_IO_OPEN_COMPLETE on_io_open_complete,
             wsio_instance->io_state = IO_STATE_OPENING;
 
             /* connect here */
-            if (xio_open(wsio_instance->underlying_io, on_underlying_io_open_complete, wsio_instance, on_underlying_io_bytes_received, wsio_instance, on_underlying_io_error, wsio_instance) != 0)
+            if (uws_open(wsio_instance->uws, on_underlying_ws_open_complete, wsio_instance, on_underlying_ws_frame_received, wsio_instance, on_underlying_ws_error, wsio_instance) != 0)
             {
                 /* Error */
                 wsio_instance->io_state = IO_STATE_NOT_OPEN;
@@ -936,7 +336,7 @@ int wsio_close(CONCRETE_IO_HANDLE ws_io, ON_IO_CLOSE_COMPLETE on_io_close_comple
                 }
             }
 
-            xio_close(wsio_instance->underlying_io, NULL, NULL);
+            uws_close(wsio_instance->uws, NULL, NULL);
             wsio_instance->io_state = IO_STATE_NOT_OPEN;
 
             if (on_io_close_complete != NULL)
@@ -964,10 +364,6 @@ void wsio_destroy(CONCRETE_IO_HANDLE ws_io)
         if (wsio_instance->hostname != NULL)
         {
             free(wsio_instance->hostname);
-        }
-        if (wsio_instance->received_bytes != NULL)
-        {
-            free(wsio_instance->received_bytes);
         }
 
         free(ws_io);
@@ -1020,7 +416,7 @@ void wsio_dowork(CONCRETE_IO_HANDLE ws_io)
         if ((wsio_instance->io_state == IO_STATE_OPEN) ||
             (wsio_instance->io_state == IO_STATE_OPENING))
         {
-            xio_dowork(wsio_instance->underlying_io);
+            uws_dowork(wsio_instance->uws);
         }
     }
 }
@@ -1096,14 +492,7 @@ int wsio_setoption(CONCRETE_IO_HANDLE ws_io, const char* optionName, const void*
         }
         else
         {
-			if (xio_setoption(wsio_instance->underlying_io, optionName, value) != 0)
-			{
-				result = __LINE__;
-			}
-			else
-			{
-				result = 0;
-			}
+			result = 0;
         }
     }
 

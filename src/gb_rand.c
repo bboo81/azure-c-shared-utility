@@ -10,7 +10,7 @@
 #include "azure_c_shared_utility/gb_rand.h"
 
 /*this is rand*/
-int gb_rand(void);
+int gb_rand(void)
 {
     return rand();
 }

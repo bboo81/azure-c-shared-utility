@@ -924,7 +924,7 @@ XX**SRS_UWS_01_436: [** When `on_underlying_io_send_complete` is called with any
    **SRS_UWS_01_240: [** The application MUST NOT send any more data frames after sending a Close frame. **]**
 
    **SRS_UWS_01_241: [** If an endpoint receives a Close frame and did not previously send a Close frame, the endpoint MUST send a Close frame in response. **]**
-   (When sending a Close frame in response, the endpoint typically echos the status code it received.)
+   **SRS_UWS_01_439: [** (When sending a Close frame in response, the endpoint typically echos the status code it received.) **]**
    **SRS_UWS_01_242: [** It SHOULD do so as soon as practical. **]**
    **SRS_UWS_01_243: [** An endpoint MAY delay sending a Close frame until its current message is sent (for instance, if the majority of a fragmented message is already sent, an endpoint MAY send the remaining fragments before sending a Close frame). **]**
    However, there is no guarantee that the endpoint that has already sent a Close frame will continue to process data.
@@ -956,11 +956,11 @@ XX**SRS_UWS_01_436: [** When `on_underlying_io_send_complete` is called with any
 
    XX**SRS_UWS_01_253: [** A Pong frame sent in response to a Ping frame must have identical "Application data" as found in the message body of the Ping frame being replied to. **]**
 
-   **SRS_UWS_01_254: [** If an endpoint receives a Ping frame and has not yet sent Pong frame(s) in response to previous Ping frame(s), the endpoint MAY elect to send a Pong frame for only the most recently processed Ping frame. **]**
+   XX**SRS_UWS_01_254: [** If an endpoint receives a Ping frame and has not yet sent Pong frame(s) in response to previous Ping frame(s), the endpoint MAY elect to send a Pong frame for only the most recently processed Ping frame. **]**
 
-   **SRS_UWS_01_255: [** A Pong frame MAY be sent unsolicited. **]**
+   XX**SRS_UWS_01_255: [** A Pong frame MAY be sent unsolicited. **]**
    This serves as a unidirectional heartbeat.
-   **SRS_UWS_01_256: [** A response to an unsolicited Pong frame is not expected. **]**
+   XX**SRS_UWS_01_256: [** A response to an unsolicited Pong frame is not expected. **]**
 
 5.6.  Data Frames
 

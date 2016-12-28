@@ -18,6 +18,12 @@
 #include "azure_c_shared_utility/buffer_.h"
 #include "azure_c_shared_utility/uws_frame_encoder.h"
 
+/* Requirements not needed as they are optional:
+Codes_SRS_UWS_01_254: [ If an endpoint receives a Ping frame and has not yet sent Pong frame(s) in response to previous Ping frame(s), the endpoint MAY elect to send a Pong frame for only the most recently processed Ping frame. ]
+Codes_SRS_UWS_01_255: [ A Pong frame MAY be sent unsolicited. ]
+Codes_SRS_UWS_01_256: [ A response to an unsolicited Pong frame is not expected. ]
+*/
+
 typedef enum UWS_STATE_TAG
 {
     UWS_STATE_CLOSED,
