@@ -448,7 +448,7 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
 
                 /* Codes_SRS_UWS_01_371: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_OK` while uws is OPENING (`uws_open` was called), uws shall prepare the WebSockets upgrade request. ]*/
                 const char upgrade_request_format[] = "GET %s HTTP/1.1\r\n"
-                    "Host: %s:%d\r\n"
+                    "Host: %s\r\n"
                     "Upgrade: websocket\r\n"
                     "Connection: Upgrade\r\n"
                     "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
@@ -459,8 +459,8 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
                 upgrade_request_length = snprintf(NULL, 0, upgrade_request_format,
                     uws->resource_name,
                     uws->hostname,
-                    uws->port,
-                    "");
+                    //uws->port,
+                    uws->protocols[0].protocol);
                 if (upgrade_request_length < 0)
                 {
                     /* Codes_SRS_UWS_01_408: [ If constructing of the WebSocket upgrade request fails, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_CONSTRUCTING_UPGRADE_REQUEST`. ]*/
@@ -478,6 +478,12 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
                     }
                     else
                     {
+                        upgrade_request_length = snprintf(upgrade_request, upgrade_request_length, upgrade_request_format,
+                            uws->resource_name,
+                            uws->hostname,
+                            //uws->port,
+                            uws->protocols[0].protocol);
+
                         /* No need to have any send complete here, as we are monitoring the received bytes */
                         /* Codes_SRS_UWS_01_372: [ Once prepared the WebSocket upgrade request shall be sent by calling `xio_send`. ]*/
                         if (xio_send(uws->underlying_io, upgrade_request, upgrade_request_length, NULL, NULL) != 0)
@@ -611,6 +617,7 @@ static void on_underlying_io_bytes_received(void* context, const unsigned char* 
                     /* Codes_SRS_UWS_01_380: [ If an WebSocket Upgrade request can be parsed from the accumulated bytes, the status shall be read from the WebSocket upgrade response. ]*/
                     /* Codes_SRS_UWS_01_381: [ If the status is 101, uws shall be considered OPEN and this shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_OK`. ]*/
                     if ((uws->received_bytes_count >= 4) &&
+                        (uws->received_bytes_count > 450) &&
                         ((request_end_ptr = strstr((const char*)uws->received_bytes, "\r\n\r\n")) != NULL))
                     {
                         /* Codes_SRS_UWS_01_384: [ Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames ]*/
@@ -995,7 +1002,7 @@ int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, boo
         {
             /* Codes_SRS_UWS_01_047: [ If allocating memory for the newly queued item fails, `uws_send_frame` shall fail and return a non-zero value. ]*/
             LogError("Cannot allocate memory for frame to be sent.");
-            result = __LINE__;
+result = __LINE__;
         }
         else
         {
@@ -1078,4 +1085,31 @@ void uws_dowork(UWS_HANDLE uws)
             xio_dowork(uws->underlying_io);
         }
     }
+}
+
+int uws_set_option(UWS_HANDLE uws, const char* option_name, const void* value)
+{
+    int result;
+
+    if (
+        (uws == NULL) ||
+        (option_name == NULL)
+        )
+    {
+        result = __LINE__;
+        LogError("invalid parameter (NULL) passed to uws_set_option");
+    }
+    else
+    {
+        if (xio_setoption(uws->underlying_io, option_name, value) != 0)
+        {
+            result = __LINE__;
+        }
+        else
+        {
+            result = 0;
+        }
+    }
+
+    return result;
 }

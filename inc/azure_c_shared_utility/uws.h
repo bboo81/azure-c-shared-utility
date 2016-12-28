@@ -67,6 +67,7 @@ extern int uws_open(UWS_HANDLE uws, ON_WS_OPEN_COMPLETE on_ws_open_complete, voi
 extern int uws_close(UWS_HANDLE uws, ON_WS_CLOSE_COMPLETE on_ws_close_complete, void* on_ws_close_complete_context);
 extern int uws_send_frame(UWS_HANDLE uws, const unsigned char* buffer, size_t size, bool is_final, ON_WS_SEND_FRAME_COMPLETE on_ws_send_frame_complete, void* callback_context);
 extern void uws_dowork(UWS_HANDLE uws);
+extern int uws_set_option(UWS_HANDLE uws, const char* option_name, const void* value);
 
 #ifdef __cplusplus
 }

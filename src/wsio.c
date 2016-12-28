@@ -35,7 +35,6 @@ typedef struct PENDING_SOCKET_IO_TAG
     ON_SEND_COMPLETE on_send_complete;
     void* callback_context;
     SINGLYLINKEDLIST_HANDLE pending_io_list;
-    bool is_partially_sent;
 } PENDING_SOCKET_IO;
 
 typedef struct WSIO_INSTANCE_TAG
@@ -89,7 +88,6 @@ static int add_pending_io(WSIO_INSTANCE* ws_io_instance, const unsigned char* bu
         }
         else
         {
-            pending_socket_io->is_partially_sent = false;
             pending_socket_io->size = size;
             pending_socket_io->on_send_complete = on_send_complete;
             pending_socket_io->callback_context = callback_context;
@@ -492,7 +490,14 @@ int wsio_setoption(CONCRETE_IO_HANDLE ws_io, const char* optionName, const void*
         }
         else
         {
-			result = 0;
+            if (uws_set_option(wsio_instance->uws, optionName, value) != 0)
+            {
+                result = __LINE__;
+            }
+            else
+            {
+                result = 0;
+            }
         }
     }
 
