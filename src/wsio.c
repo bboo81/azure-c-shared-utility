@@ -133,32 +133,6 @@ static void on_underlying_ws_send_frame_complete(void* context, WS_SEND_FRAME_RE
     (void)ws_send_frame_result;
 }
 
-static void send_pending_ios(WSIO_INSTANCE* wsio_instance)
-{
-    LIST_ITEM_HANDLE first_pending_io;
-
-    first_pending_io = singlylinkedlist_get_head_item(wsio_instance->pending_io_list);
-
-    if (first_pending_io != NULL)
-    {
-        PENDING_SOCKET_IO* pending_socket_io = (PENDING_SOCKET_IO*)singlylinkedlist_item_get_value(first_pending_io);
-        if (pending_socket_io == NULL)
-        {
-            indicate_error(wsio_instance);
-        }
-        else
-        {
-            if (uws_send_frame(wsio_instance->uws, pending_socket_io->bytes, pending_socket_io->size, true, on_underlying_ws_send_frame_complete, first_pending_io) != 0)
-            {
-                indicate_error(wsio_instance);
-            }
-            else
-            {
-            }
-        }
-    }
-}
-
 CONCRETE_IO_HANDLE wsio_create(void* io_create_parameters)
 {
     WSIO_CONFIG* ws_io_config = io_create_parameters;
@@ -183,8 +157,6 @@ CONCRETE_IO_HANDLE wsio_create(void* io_create_parameters)
             result->on_io_open_complete_context = NULL;
             result->on_io_error = NULL;
             result->on_io_error_context = NULL;
-            result->proxy_address = NULL;
-            result->proxy_port = 0;
             result->uws = uws_create(ws_io_config->hostname, 443, "/$iothub/websocket", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
 
             hostname_length = strlen(ws_io_config->hostname);
@@ -441,70 +413,14 @@ int wsio_setoption(CONCRETE_IO_HANDLE ws_io, const char* optionName, const void*
     else
     {
         WSIO_INSTANCE* wsio_instance = (WSIO_INSTANCE*)ws_io;
-		if (strcmp(OPTION_HTTP_PROXY, optionName) == 0)
+        
+        if (uws_set_option(wsio_instance->uws, optionName, value) != 0)
         {
-            HTTP_PROXY_OPTIONS* proxy_data = (HTTP_PROXY_OPTIONS*)value;
-            if (proxy_data->host_address == NULL || (proxy_data->username != NULL && proxy_data->password == NULL))
-            {
-                result = __LINE__;
-            }
-            else
-            {
-                wsio_instance->proxy_port = proxy_data->port;
-                if (proxy_data->username != NULL)
-                {
-                    size_t length = strlen(proxy_data->host_address) + strlen(proxy_data->username) + strlen(proxy_data->password) + 3 + 5;
-                    wsio_instance->proxy_address = (char*)malloc(length + 1);
-                    if (wsio_instance->proxy_address == NULL)
-                    {
-                        result = __LINE__;
-                    }
-                    else
-                    {
-                        if (sprintf(wsio_instance->proxy_address, "%s:%s@%s:%d", proxy_data->username, proxy_data->password, proxy_data->host_address, wsio_instance->proxy_port) <= 0)
-                        {
-                            result = __LINE__;
-                            free(wsio_instance->proxy_address);
-                        }
-                        else
-                        {
-                            result = 0;
-                        }
-                    }
-                }
-                else
-                {
-                    size_t length = strlen(proxy_data->host_address) + 6 + 1;
-                    wsio_instance->proxy_address = (char*)malloc(length + 1);
-                    if (wsio_instance->proxy_address == NULL)
-                    {
-                        result = __LINE__;
-                    }
-                    else
-                    {
-                        if (sprintf(wsio_instance->proxy_address, "%s:%d", proxy_data->host_address, wsio_instance->proxy_port) <= 0)
-                        {
-                            result = __LINE__;
-                            free(wsio_instance->proxy_address);
-                        }
-                        else
-                        {
-                            result = 0;
-                        }
-                    }
-                }
-            }
+            result = __LINE__;
         }
         else
         {
-            if (uws_set_option(wsio_instance->uws, optionName, value) != 0)
-            {
-                result = __LINE__;
-            }
-            else
-            {
-                result = 0;
-            }
+            result = 0;
         }
     }
 
@@ -522,17 +438,6 @@ void* wsio_clone_option(const char* name, const void* value)
         /* Codes_SRS_WSIO_01_140: [ If the name or value arguments are NULL, wsio_clone_option shall return NULL. ]*/
         LogError("invalid parameter detected: const char* name=%p, const void* value=%p", name, value);
         result = NULL;
-    }
-    else if (strcmp("TrustedCerts", name) == 0)
-    {
-        /* Codes_SRS_WSIO_01_141: [ wsio_clone_option shall clone the option named `TrustedCerts` by calling mallocAndStrcpy_s. ]*/
-        /* Codes_SRS_WSIO_01_143: [ On success it shall return a non-NULL pointer to the cloned option. ]*/
-        if (mallocAndStrcpy_s((char**)&result, (const char*)value) != 0)
-        {
-            /* Codes_SRS_WSIO_01_142: [ If mallocAndStrcpy_s for `TrustedCerts` fails, wsio_clone_option shall return NULL. ]*/
-            LogError("unable to mallocAndStrcpy_s TrustedCerts value");
-            result = NULL;
-        }
     }
     else
     {
@@ -552,26 +457,6 @@ void wsio_destroy_option(const char* name, const void* value)
         /* Codes_SRS_WSIO_01_147: [ If any of the arguments is NULL, wsio_destroy_option shall do nothing. ]*/
         LogError("invalid parameter detected: const char* name=%p, const void* value=%p", name, value);
     }
-    else if (strcmp(name, OPTION_HTTP_PROXY) == 0)
-    {
-        HTTP_PROXY_OPTIONS* proxy_data = (HTTP_PROXY_OPTIONS*)value;
-        free((char*)proxy_data->host_address);
-        if (proxy_data->username)
-        {
-            free((char*)proxy_data->username);
-        }
-        if (proxy_data->password)
-        {
-            free((char*)proxy_data->password);
-        }
-        free(proxy_data);
-    }
-	else if (
-		/* Codes_SRS_WSIO_01_144: [ If the option name is `TrustedCerts`, wsio_destroy_option shall free the char\* option indicated by value. ]*/
-		strcmp(name, "TrustedCerts") == 0)
-	{
-		free((void*)value);
-	}
 }
 
 OPTIONHANDLER_HANDLE wsio_retrieveoptions(CONCRETE_IO_HANDLE handle)
@@ -615,4 +500,3 @@ const IO_INTERFACE_DESCRIPTION* wsio_get_interface_description(void)
 {
     return &ws_io_interface_description;
 }
-
