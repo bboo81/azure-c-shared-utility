@@ -5,6 +5,7 @@
 #ifdef _CRTDBG_MAP_ALLOC
 #include <crtdbg.h>
 #endif
+
 #include <stddef.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -30,8 +31,6 @@ typedef enum IO_STATE_TAG
 
 typedef struct PENDING_SOCKET_IO_TAG
 {
-    unsigned char* bytes;
-    size_t size;
     ON_SEND_COMPLETE on_send_complete;
     void* callback_context;
     SINGLYLINKEDLIST_HANDLE pending_io_list;
@@ -70,7 +69,7 @@ static void indicate_open_complete(WSIO_INSTANCE* ws_io_instance, IO_OPEN_RESULT
     }
 }
 
-static LIST_ITEM_HANDLE add_pending_io(WSIO_INSTANCE* ws_io_instance, const unsigned char* buffer, size_t size, ON_SEND_COMPLETE on_send_complete, void* callback_context)
+static LIST_ITEM_HANDLE add_pending_io(WSIO_INSTANCE* ws_io_instance, ON_SEND_COMPLETE on_send_complete, void* callback_context)
 {
     LIST_ITEM_HANDLE result;
     PENDING_SOCKET_IO* pending_socket_io = (PENDING_SOCKET_IO*)malloc(sizeof(PENDING_SOCKET_IO));
@@ -80,29 +79,17 @@ static LIST_ITEM_HANDLE add_pending_io(WSIO_INSTANCE* ws_io_instance, const unsi
     }
     else
     {
-        pending_socket_io->bytes = (unsigned char*)malloc(size);
-        if (pending_socket_io->bytes == NULL)
+        pending_socket_io->on_send_complete = on_send_complete;
+        pending_socket_io->callback_context = callback_context;
+        pending_socket_io->pending_io_list = ws_io_instance->pending_io_list;
+
+        if ((result = singlylinkedlist_add(ws_io_instance->pending_io_list, pending_socket_io)) == NULL)
         {
             free(pending_socket_io);
-            result = NULL;
         }
         else
         {
-            pending_socket_io->size = size;
-            pending_socket_io->on_send_complete = on_send_complete;
-            pending_socket_io->callback_context = callback_context;
-            pending_socket_io->pending_io_list = ws_io_instance->pending_io_list;
-            (void)memcpy(pending_socket_io->bytes, buffer, size);
-
-            if ((result = singlylinkedlist_add(ws_io_instance->pending_io_list, pending_socket_io)) == NULL)
-            {
-                free(pending_socket_io->bytes);
-                free(pending_socket_io);
-            }
-            else
-            {
-                result = 0;
-            }
+            result = 0;
         }
     }
 
@@ -113,7 +100,6 @@ static int remove_pending_io(WSIO_INSTANCE* wsio_instance, LIST_ITEM_HANDLE item
 {
     int result;
 
-    free(pending_socket_io->bytes);
     free(pending_socket_io);
     if (singlylinkedlist_remove(wsio_instance->pending_io_list, item_handle) != 0)
     {
@@ -297,7 +283,6 @@ int wsio_close(CONCRETE_IO_HANDLE ws_io, ON_IO_CLOSE_COMPLETE on_io_close_comple
 
                         if (pending_socket_io != NULL)
                         {
-                            free(pending_socket_io->bytes);
                             free(pending_socket_io);
                         }
                     }
@@ -361,13 +346,12 @@ int wsio_send(CONCRETE_IO_HANDLE ws_io, const void* buffer, size_t size, ON_SEND
         else
         {
             LIST_ITEM_HANDLE new_item;
-            if ((new_item = add_pending_io(wsio_instance, buffer, size, on_send_complete, callback_context)) != 0)
+            if ((new_item = add_pending_io(wsio_instance, on_send_complete, callback_context)) != 0)
             {
                 result = __LINE__;
             }
             else
             {
-                /* I guess send here */
                 if (uws_send_frame(wsio_instance->uws, buffer, size, true, on_underlying_ws_send_frame_complete, new_item) != 0)
                 {
                     indicate_error(wsio_instance);
@@ -406,7 +390,6 @@ int wsio_setoption(CONCRETE_IO_HANDLE ws_io, const char* optionName, const void*
         (optionName == NULL)
         )
     {
-        /* Codes_SRS_WSIO_01_136: [ If any of the arguments ws_io or option_name is NULL wsio_setoption shall return a non-zero value. ] ]*/
         result = __LINE__;
         LogError("invalid parameter (NULL) passed to HTTPAPI_SetOption");
     }
@@ -427,7 +410,6 @@ int wsio_setoption(CONCRETE_IO_HANDLE ws_io, const char* optionName, const void*
     return result;
 }
 
-/*this function will clone an option given by name and value*/
 void* wsio_clone_option(const char* name, const void* value)
 {
     void* result;
@@ -435,7 +417,6 @@ void* wsio_clone_option(const char* name, const void* value)
         (name == NULL) || (value == NULL)
        )
     {
-        /* Codes_SRS_WSIO_01_140: [ If the name or value arguments are NULL, wsio_clone_option shall return NULL. ]*/
         LogError("invalid parameter detected: const char* name=%p, const void* value=%p", name, value);
         result = NULL;
     }
@@ -454,7 +435,6 @@ void wsio_destroy_option(const char* name, const void* value)
         (name == NULL) || (value == NULL)
        )
     {
-        /* Codes_SRS_WSIO_01_147: [ If any of the arguments is NULL, wsio_destroy_option shall do nothing. ]*/
         LogError("invalid parameter detected: const char* name=%p, const void* value=%p", name, value);
     }
 }
@@ -469,7 +449,6 @@ OPTIONHANDLER_HANDLE wsio_retrieveoptions(CONCRETE_IO_HANDLE handle)
     }
     else
     {
-        /*Codes_SRS_WSIO_02_002: [** `wsio_retrieveoptions` shall produce an OPTIONHANDLER_HANDLE. ]*/
         result = OptionHandler_Create(wsio_clone_option, wsio_destroy_option, wsio_setoption);
         if (result == NULL)
         {
