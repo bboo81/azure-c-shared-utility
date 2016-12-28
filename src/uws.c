@@ -448,7 +448,7 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
 
                 /* Codes_SRS_UWS_01_371: [ When `on_underlying_io_open_complete` is called with `IO_OPEN_OK` while uws is OPENING (`uws_open` was called), uws shall prepare the WebSockets upgrade request. ]*/
                 const char upgrade_request_format[] = "GET %s HTTP/1.1\r\n"
-                    "Host: %s\r\n"
+                    "Host: %s:%d\r\n"
                     "Upgrade: websocket\r\n"
                     "Connection: Upgrade\r\n"
                     "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
@@ -459,7 +459,7 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
                 upgrade_request_length = snprintf(NULL, 0, upgrade_request_format,
                     uws->resource_name,
                     uws->hostname,
-                    //uws->port,
+                    uws->port,
                     uws->protocols[0].protocol);
                 if (upgrade_request_length < 0)
                 {
@@ -481,7 +481,7 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
                         upgrade_request_length = snprintf(upgrade_request, upgrade_request_length, upgrade_request_format,
                             uws->resource_name,
                             uws->hostname,
-                            //uws->port,
+                            uws->port,
                             uws->protocols[0].protocol);
 
                         /* No need to have any send complete here, as we are monitoring the received bytes */
