@@ -256,6 +256,8 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resou
                                         result->protocols = (WS_INSTANCE_PROTOCOL*)malloc(sizeof(WS_INSTANCE_PROTOCOL) * protocol_count);
                                         if (result->protocols == NULL)
                                         {
+                                            /* Codes_SRS_UWS_01_414: [ If allocating memory for the copied protocol information fails then `uws_create` shall fail and return NULL. ]*/
+                                            LogError("Cannot allocate memory for the protocols array.");
                                             xio_destroy(result->underlying_io);
                                             singlylinkedlist_destroy(result->pending_sends);
                                             free(result->resource_name);
@@ -266,10 +268,13 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resou
                                         }
                                         else
                                         {
+                                            /* Codes_SRS_UWS_01_413: [ The protocol information indicated by `protocols` and `protocol_count` shall be copied for later use (for constructing the upgrade request). ]*/
                                             for (i = 0; i < protocol_count; i++)
                                             {
                                                 if (mallocAndStrcpy_s(&result->protocols[i].protocol, protocols[i].protocol) != 0)
                                                 {
+                                                    /* Codes_SRS_UWS_01_414: [ If allocating memory for the copied protocol information fails then `uws_create` shall fail and return NULL. ]*/
+                                                    LogError("Cannot allocate memory for the protocol index %u.", (unsigned int)i);
                                                     break;
                                                 }
                                             }
@@ -322,10 +327,12 @@ void uws_destroy(UWS_HANDLE uws)
 
         if (uws->protocol_count > 0)
         {
+            /* Codes_SRS_UWS_01_437: [ `uws_destroy` shall free the protocols array allocated in `uws_create`. ]*/
             for (i = 0; i < uws->protocol_count; i++)
             {
                 free(uws->protocols[i].protocol);
             }
+
             free(uws->protocols);
         }
 

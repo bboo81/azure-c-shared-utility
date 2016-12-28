@@ -70,8 +70,8 @@ XX**SRS_UWS_01_404: [** The argument `resource_name` shall be copied for later u
 XX**SRS_UWS_01_410: [** The `protocols` argument shall be allowed to be NULL, in which case no protocol is to be specified by the client in the upgrade request. **]**
 XX**SRS_UWS_01_411: [** If `protocol_count` is non zero and `protocols` is NULL then `uws_create` shall fail and return NULL. **]**
 XX**SRS_UWS_01_412: [** If the `protocol` member of any of the items in the `protocols` argument is NULL, then `uws_create` shall fail and return NULL. **]**
-**SRS_UWS_01_413: [** The protocol information indicated by `protocols` and `protocol_count` shall be copied for later use (for constructing the upgrade request). **]**
-**SRS_UWS_01_414: [** If allocating memory for the copied protocol information fails then `uws_create` shall fail and return NULL. **]**
+XX**SRS_UWS_01_413: [** The protocol information indicated by `protocols` and `protocol_count` shall be copied for later use (for constructing the upgrade request). **]**
+XX**SRS_UWS_01_414: [** If allocating memory for the copied protocol information fails then `uws_create` shall fail and return NULL. **]**
 XX**SRS_UWS_01_405: [** If allocating memory for the copy of the `resource_name` argument fails, then `uws_create` shall return NULL. **]**
 XX**SRS_UWS_01_005: [** If `use_ssl` is 0 then `uws_create` shall obtain the interface used to create a socketio instance by calling `socketio_get_interface_description`. **]**
 XX**SRS_UWS_01_006: [** If `use_ssl` is 1 then `uws_create` shall obtain the interface used to create a tlsio instance by calling `platform_get_default_tlsio`. **]**
@@ -101,6 +101,7 @@ XX**SRS_UWS_01_424: [** `uws_destroy` shall free the buffer allocated in `uws_cr
 **SRS_UWS_01_022: [** `uws_destroy` shall execute a close action if an open is in progress. **]**
 XX**SRS_UWS_01_023: [** `uws_destroy` shall destroy the underlying IO created in `uws_create` by calling `xio_destroy`. **]**
 XX**SRS_UWS_01_024: [** `uws_destroy` shall free the list used to track the pending sends by calling `singlylinkedlist_destroy`. **]**
+XX**SRS_UWS_01_437: [** `uws_destroy` shall free the protocols array allocated in `uws_create`. **]**
 
 ### uws_open
 

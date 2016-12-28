@@ -454,6 +454,7 @@ TEST_FUNCTION_CLEANUP(method_cleanup)
 /* Tests_SRS_UWS_01_403: [ The argument `port` shall be copied for later use. ]*/
 /* Tests_SRS_UWS_01_404: [ The argument `resource_name` shall be copied for later use. ]*/
 /* Tests_SRS_UWS_01_422: [ `uws_create` shall create a buffer to be used for encoding outgoing frames by calling `BUFFER_new`. ]*/
+/* Tests_SRS_UWS_01_413: [ The protocol information indicated by `protocols` and `protocol_count` shall be copied for later use (for constructing the upgrade request). ]*/
 TEST_FUNCTION(uws_create_with_valid_args_no_ssl_succeeds)
 {
 	// arrange
@@ -843,6 +844,139 @@ TEST_FUNCTION(when_creating_the_io_handle_fails_then_uws_create_fails)
     ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
 }
 
+/* Tests_SRS_UWS_01_414: [ If allocating memory for the copied protocol information fails then `uws_create` shall fail and return NULL. ]*/
+TEST_FUNCTION(when_allocating_memory_for_the_protocols_array_fails_then_uws_create_fails)
+{
+    // arrange
+    SOCKETIO_CONFIG socketio_config;
+    UWS_HANDLE uws;
+    BUFFER_HANDLE buffer_handle;
+
+    socketio_config.accepted_socket = NULL;
+    socketio_config.hostname = "test_host";
+    socketio_config.port = 80;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_resource/1"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(singlylinkedlist_create());
+    STRICT_EXPECTED_CALL(socketio_get_interface_description());
+    STRICT_EXPECTED_CALL(xio_create(TEST_SOCKET_IO_INTERFACE_DESCRIPTION, &socketio_config))
+        .IgnoreArgument_io_create_parameters();
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG))
+        .SetReturn(NULL);
+    STRICT_EXPECTED_CALL(xio_destroy(TEST_IO_HANDLE));
+    STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_delete(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle);
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    uws = uws_create("test_host", 80, "test_resource/1", false, protocols, sizeof(protocols) / sizeof(protocols[0]));
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_414: [ If allocating memory for the copied protocol information fails then `uws_create` shall fail and return NULL. ]*/
+TEST_FUNCTION(when_allocating_memory_for_the_first_proitocol_name_fails_then_uws_create_fails)
+{
+    // arrange
+    SOCKETIO_CONFIG socketio_config;
+    UWS_HANDLE uws;
+    BUFFER_HANDLE buffer_handle;
+
+    socketio_config.accepted_socket = NULL;
+    socketio_config.hostname = "test_host";
+    socketio_config.port = 80;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_resource/1"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(singlylinkedlist_create());
+    STRICT_EXPECTED_CALL(socketio_get_interface_description());
+    STRICT_EXPECTED_CALL(xio_create(TEST_SOCKET_IO_INTERFACE_DESCRIPTION, &socketio_config))
+        .IgnoreArgument_io_create_parameters();
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_protocol"))
+        .IgnoreArgument_destination()
+        .SetReturn(1);
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(xio_destroy(TEST_IO_HANDLE));
+    STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_delete(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle);
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    uws = uws_create("test_host", 80, "test_resource/1", false, protocols, sizeof(protocols) / sizeof(protocols[0]));
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_414: [ If allocating memory for the copied protocol information fails then `uws_create` shall fail and return NULL. ]*/
+TEST_FUNCTION(when_allocating_memory_for_the_second_proitocol_name_fails_then_uws_create_fails)
+{
+    // arrange
+    SOCKETIO_CONFIG socketio_config;
+    UWS_HANDLE uws;
+    BUFFER_HANDLE buffer_handle;
+    static const WS_PROTOCOL two_protocols[] = { { "test_protocol1" }, { "test_protocol2" } };
+
+    socketio_config.accepted_socket = NULL;
+    socketio_config.hostname = "test_host";
+    socketio_config.port = 80;
+
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_new())
+        .CaptureReturn(&buffer_handle);
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_host"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_resource/1"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(singlylinkedlist_create());
+    STRICT_EXPECTED_CALL(socketio_get_interface_description());
+    STRICT_EXPECTED_CALL(xio_create(TEST_SOCKET_IO_INTERFACE_DESCRIPTION, &socketio_config))
+        .IgnoreArgument_io_create_parameters();
+    EXPECTED_CALL(gballoc_malloc(IGNORED_NUM_ARG));
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_protocol1"))
+        .IgnoreArgument_destination();
+    STRICT_EXPECTED_CALL(mallocAndStrcpy_s(IGNORED_PTR_ARG, "test_protocol2"))
+        .IgnoreArgument_destination()
+        .SetReturn(1);
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(xio_destroy(TEST_IO_HANDLE));
+    STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(BUFFER_delete(IGNORED_PTR_ARG))
+        .ValidateArgumentValue_handle(&buffer_handle);
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    uws = uws_create("test_host", 80, "test_resource/1", false, two_protocols, sizeof(two_protocols) / sizeof(two_protocols[0]));
+
+    // assert
+    ASSERT_IS_NULL(uws);
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
 /* Tests_SRS_UWS_01_006: [ If `use_ssl` is 1 then `uws_create` shall obtain the interface used to create a tlsio instance by calling `platform_get_default_tlsio`. ]*/
 /* Tests_SRS_UWS_01_013: [ The create arguments for the tls IO (when `use_ssl` is 1) shall have: ]*/
 /* Tests_SRS_UWS_01_014: [ - `hostname` set to the `hostname` argument passed to `uws_create`. ]*/
@@ -961,6 +1095,7 @@ TEST_FUNCTION(when_getting_the_tlsio_interface_fails_then_uws_create_fails)
 /* Tests_SRS_UWS_01_023: [ `uws_destroy` shall destroy the underlying IO created in `uws_create` by calling `xio_destroy`. ]*/
 /* Tests_SRS_UWS_01_024: [ `uws_destroy` shall free the list used to track the pending sends by calling `singlylinkedlist_destroy`. ]*/
 /* Tests_SRS_UWS_01_424: [ `uws_destroy` shall free the buffer allocated in `uws_create` by calling `BUFFER_delete`. ]*/
+/* Tests_SRS_UWS_01_437: [ `uws_destroy` shall free the protocols array allocated in `uws_create`. ]*/
 TEST_FUNCTION(uws_destroy_fress_the_resources)
 {
     // arrange
@@ -975,6 +1110,64 @@ TEST_FUNCTION(uws_destroy_fress_the_resources)
 
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(xio_destroy(TEST_IO_HANDLE));
+    STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(BUFFER_delete(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    uws_destroy(uws);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_437: [ `uws_destroy` shall free the protocols array allocated in `uws_create`. ]*/
+TEST_FUNCTION(uws_destroy_with_2_protocols_fress_both_protocols)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+    static const WS_PROTOCOL two_protocols[] = { { "test_protocol1" },{ "test_protocol2" } };
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "aaa", true, two_protocols, sizeof(two_protocols) / sizeof(two_protocols[0]));
+    umock_c_reset_all_calls();
+
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    STRICT_EXPECTED_CALL(xio_destroy(TEST_IO_HANDLE));
+    STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+    EXPECTED_CALL(BUFFER_delete(IGNORED_PTR_ARG));
+    EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
+
+    // act
+    uws_destroy(uws);
+
+    // assert
+    ASSERT_ARE_EQUAL(char_ptr, umock_c_get_expected_calls(), umock_c_get_actual_calls());
+}
+
+/* Tests_SRS_UWS_01_437: [ `uws_destroy` shall free the protocols array allocated in `uws_create`. ]*/
+TEST_FUNCTION(uws_destroy_with_no_protocols_frees_all_other_resources)
+{
+    // arrange
+    TLSIO_CONFIG tlsio_config;
+    UWS_HANDLE uws;
+
+    tlsio_config.hostname = "test_host";
+    tlsio_config.port = 444;
+
+    uws = uws_create("test_host", 444, "aaa", true, NULL, 0);
+    umock_c_reset_all_calls();
+
     STRICT_EXPECTED_CALL(xio_destroy(TEST_IO_HANDLE));
     STRICT_EXPECTED_CALL(singlylinkedlist_destroy(TEST_SINGLYLINKEDSINGLYLINKEDLIST_HANDLE));
     EXPECTED_CALL(gballoc_free(IGNORED_PTR_ARG));
