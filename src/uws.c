@@ -469,7 +469,7 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
                 }
                 else
                 {
-                    upgrade_request = (char*)malloc(upgrade_request_length);
+                    upgrade_request = (char*)malloc(upgrade_request_length + 1);
                     if (upgrade_request == NULL)
                     {
                         /* Codes_SRS_UWS_01_406: [ If not enough memory can be allocated to construct the WebSocket upgrade request, uws shall report that the open failed by calling the `on_ws_open_complete` callback passed to `uws_open` with `WS_OPEN_ERROR_NOT_ENOUGH_MEMORY`. ]*/
@@ -478,7 +478,7 @@ static void on_underlying_io_open_complete(void* context, IO_OPEN_RESULT open_re
                     }
                     else
                     {
-                        upgrade_request_length = snprintf(upgrade_request, upgrade_request_length, upgrade_request_format,
+                        upgrade_request_length = snprintf(upgrade_request, upgrade_request_length + 1, upgrade_request_format,
                             uws->resource_name,
                             uws->hostname,
                             uws->port,
@@ -617,7 +617,6 @@ static void on_underlying_io_bytes_received(void* context, const unsigned char* 
                     /* Codes_SRS_UWS_01_380: [ If an WebSocket Upgrade request can be parsed from the accumulated bytes, the status shall be read from the WebSocket upgrade response. ]*/
                     /* Codes_SRS_UWS_01_381: [ If the status is 101, uws shall be considered OPEN and this shall be indicated by calling the `on_ws_open_complete` callback passed to `uws_open` with `IO_OPEN_OK`. ]*/
                     if ((uws->received_bytes_count >= 4) &&
-                        (uws->received_bytes_count > 450) &&
                         ((request_end_ptr = strstr((const char*)uws->received_bytes, "\r\n\r\n")) != NULL))
                     {
                         /* Codes_SRS_UWS_01_384: [ Any extra bytes that are left unconsumed after decoding a succesfull WebSocket upgrade response shall be used for decoding WebSocket frames ]*/

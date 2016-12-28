@@ -70,13 +70,13 @@ static void indicate_open_complete(WSIO_INSTANCE* ws_io_instance, IO_OPEN_RESULT
     }
 }
 
-static int add_pending_io(WSIO_INSTANCE* ws_io_instance, const unsigned char* buffer, size_t size, ON_SEND_COMPLETE on_send_complete, void* callback_context)
+static LIST_ITEM_HANDLE add_pending_io(WSIO_INSTANCE* ws_io_instance, const unsigned char* buffer, size_t size, ON_SEND_COMPLETE on_send_complete, void* callback_context)
 {
-    int result;
+    LIST_ITEM_HANDLE result;
     PENDING_SOCKET_IO* pending_socket_io = (PENDING_SOCKET_IO*)malloc(sizeof(PENDING_SOCKET_IO));
     if (pending_socket_io == NULL)
     {
-        result = __LINE__;
+        result = NULL;
     }
     else
     {
@@ -84,7 +84,7 @@ static int add_pending_io(WSIO_INSTANCE* ws_io_instance, const unsigned char* bu
         if (pending_socket_io->bytes == NULL)
         {
             free(pending_socket_io);
-            result = __LINE__;
+            result = NULL;
         }
         else
         {
@@ -94,11 +94,10 @@ static int add_pending_io(WSIO_INSTANCE* ws_io_instance, const unsigned char* bu
             pending_socket_io->pending_io_list = ws_io_instance->pending_io_list;
             (void)memcpy(pending_socket_io->bytes, buffer, size);
 
-            if (singlylinkedlist_add(ws_io_instance->pending_io_list, pending_socket_io) == NULL)
+            if ((result = singlylinkedlist_add(ws_io_instance->pending_io_list, pending_socket_io)) == NULL)
             {
                 free(pending_socket_io->bytes);
                 free(pending_socket_io);
-                result = __LINE__;
             }
             else
             {
@@ -223,6 +222,7 @@ static void on_underlying_ws_open_complete(void* context, WS_OPEN_RESULT open_re
 
     (void)open_result;
     wsio_instance->io_state = IO_STATE_OPEN;
+    indicate_open_complete(wsio_instance, IO_OPEN_OK);
 }
 
 static void on_underlying_ws_frame_received(void* context, unsigned char frame_type, const unsigned char* buffer, size_t size)
@@ -388,14 +388,21 @@ int wsio_send(CONCRETE_IO_HANDLE ws_io, const void* buffer, size_t size, ON_SEND
         }
         else
         {
-            if (add_pending_io(wsio_instance, buffer, size, on_send_complete, callback_context) != 0)
+            LIST_ITEM_HANDLE new_item;
+            if ((new_item = add_pending_io(wsio_instance, buffer, size, on_send_complete, callback_context)) != 0)
             {
                 result = __LINE__;
             }
             else
             {
                 /* I guess send here */
-                send_pending_ios(wsio_instance);
+                if (uws_send_frame(wsio_instance->uws, buffer, size, true, on_underlying_ws_send_frame_complete, new_item) != 0)
+                {
+                    indicate_error(wsio_instance);
+                }
+                else
+                {
+                }
 
                 result = 0;
             }
