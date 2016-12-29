@@ -46,9 +46,6 @@ typedef struct WSIO_INSTANCE_TAG
     void* on_io_error_context;
     IO_STATE io_state;
     SINGLYLINKEDLIST_HANDLE pending_io_list;
-    char* hostname;
-    char* proxy_address;
-    int proxy_port;
     UWS_HANDLE uws;
 } WSIO_INSTANCE;
 
@@ -134,8 +131,9 @@ CONCRETE_IO_HANDLE wsio_create(void* io_create_parameters)
         result = (WSIO_INSTANCE*)malloc(sizeof(WSIO_INSTANCE));
         if (result != NULL)
         {
-            size_t hostname_length;
-            static const WS_PROTOCOL protocols[] = { { "AMQPWSB10" } };
+            WS_PROTOCOL protocols;
+
+            protocols.protocol = ws_io_config->protocol;
 
             result->on_bytes_received = NULL;
             result->on_bytes_received_context = NULL;
@@ -143,23 +141,18 @@ CONCRETE_IO_HANDLE wsio_create(void* io_create_parameters)
             result->on_io_open_complete_context = NULL;
             result->on_io_error = NULL;
             result->on_io_error_context = NULL;
-            result->uws = uws_create(ws_io_config->hostname, 443, "/$iothub/websocket", true, protocols, sizeof(protocols) / sizeof(protocols[0]));
-
-            hostname_length = strlen(ws_io_config->hostname);
-            result->hostname = malloc(hostname_length + 1);
-            if (result->hostname == NULL)
+            result->uws = uws_create_with_io(ws_io_config->underlying_io, ws_io_config->resource_name, &protocols, 1);
+            if (result->uws == NULL)
             {
                 free(result);
                 result = NULL;
             }
             else
             {
-                (void)memcpy(result->hostname, ws_io_config->hostname, hostname_length + 1);
-
                 result->pending_io_list = singlylinkedlist_create();
                 if (result->pending_io_list == NULL)
                 {
-                    free(result->hostname);
+                    uws_destroy(result->uws);
                     free(result);
                     result = NULL;
                 }
@@ -312,15 +305,8 @@ void wsio_destroy(CONCRETE_IO_HANDLE ws_io)
     {
         WSIO_INSTANCE* wsio_instance = (WSIO_INSTANCE*)ws_io;
 
-        (void)wsio_close(wsio_instance, NULL, NULL);
-
+        uws_destroy(wsio_instance->uws);
         singlylinkedlist_destroy(wsio_instance->pending_io_list);
-
-        if (wsio_instance->hostname != NULL)
-        {
-            free(wsio_instance->hostname);
-        }
-
         free(ws_io);
     }
 }

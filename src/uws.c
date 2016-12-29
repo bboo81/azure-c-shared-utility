@@ -316,6 +316,15 @@ UWS_HANDLE uws_create(const char* hostname, unsigned int port, const char* resou
     return result;
 }
 
+UWS_HANDLE uws_create_with_io(XIO_HANDLE io_handle, const char* resource_name, const WS_PROTOCOL* protocols, size_t protocol_count)
+{
+    (void)io_handle;
+    (void)resource_name;
+    (void)protocols;
+    (void)protocol_count;
+    return NULL;
+}
+
 void uws_destroy(UWS_HANDLE uws)
 {
     /* Codes_SRS_UWS_01_020: [ If `uws` is NULL, `uws_destroy` shall do nothing. ]*/

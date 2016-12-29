@@ -13,8 +13,10 @@ RFC6455 - The WebSocket Protocol.
 ```c
 typedef struct WSIO_CONFIG_TAG
 {
-	const char* host;
-	int use_ssl : 1;
+	const char* hostname;
+	XIO_HANDLE underlying_io;
+	const char* resource_name;
+	const char* protocol;
 } WSIO_CONFIG;
 
 extern const IO_INTERFACE_DESCRIPTION* wsio_get_interface_description(void);
@@ -26,19 +28,19 @@ extern const IO_INTERFACE_DESCRIPTION* wsio_get_interface_description(void);
 extern CONCRETE_IO_HANDLE wsio_create(void* io_create_parameters);
 ```
 
-**SRS_WSIO_01_001: [**`wsio_create` shall create an instance of wsio and return a non-NULL handle to it.**]**
+X**SRS_WSIO_01_001: [**`wsio_create` shall create an instance of wsio and return a non-NULL handle to it.**]**
 **SRS_WSIO_01_065: [** If the argument `io_create_parameters` is NULL then `wsio_create` shall return NULL. **]**
-**SRS_WSIO_01_066: [** `io_create_parameters` shall be used as a `WSIO_CONFIG*` . **]**
-**SRS_WSIO_01_067: [** If the member `host` is NULL in `WSIO_CONFIG` then `wsio_create` shall return NULL. **]**
+X**SRS_WSIO_01_066: [** `io_create_parameters` shall be used as a `WSIO_CONFIG*` . **]**
+**SRS_WSIO_01_067: [** If any of the members `hostname`, `resource_name` or `protocol` is NULL in `WSIO_CONFIG` then `wsio_create` shall return NULL. **]**
 **SRS_WSIO_01_068: [** If allocating memory for the new wsio instance fails then `wsio_create` shall return NULL. **]**
-**SRS_WSIO_01_069: [** The member `host` shall be copied for later use (they are needed when the IO is opened). **]**
-**SRS_WSIO_01_070: [** The underlying uws instance shall be created by calling `uws_create`. **]**
-**SRS_WSIO_01_071: [** The arguments for `uws_create` shall be: **]**
-**SRS_WSIO_01_072: [** - `hostname` set to the `host` field in the `io_create_parameters` passed to `wsio_create`. **]**
-**SRS_WSIO_01_073: [** - `port` set to 80 if `use_ssl` is 0. **]**
-**SRS_WSIO_01_074: [** - `port` set to 443 if `use_ssl` is 1. **]**
-**SRS_WSIO_01_075: [** If `uws_create` fails, then `wsio_create` shall fail and return NULL. **]**
-**SRS_WSIO_01_076: [** `wsio_create` shall create a pending send IO list that is to be used to queue send packets by calling `singlylinkedlist_create`. **]**
+X**SRS_WSIO_01_070: [** The underlying uws instance shall be created by calling `uws_create_with_io`. **]**
+X**SRS_WSIO_01_071: [** The arguments for `uws_create_with_io` shall be: **]**
+X**SRS_WSIO_01_072: [** - `hostname` set to the `hostname` field in the `io_create_parameters` passed to `wsio_create`. **]**
+- `resource_name` set to the `resource_name` field in the `io_create_parameters` passed to `wsio_create`.
+- `protocols` shall be filled with only one structure, that shall have the `protocol` set to the value of the `protocol` field in the `io_create_parameters` passed to `wsio_create`.
+X**SRS_WSIO_01_073: [** - `underlying_io` shall be set to the `underlying_io` member in `io_create_parameters`. **]**
+**SRS_WSIO_01_075: [** If `uws_create_with_io` fails, then `wsio_create` shall fail and return NULL. **]**
+X**SRS_WSIO_01_076: [** `wsio_create` shall create a pending send IO list that is to be used to queue send packets by calling `singlylinkedlist_create`. **]**
 **SRS_WSIO_01_077: [** If `singlylinkedlist_create` fails then `wsio_create` shall fail and return NULL. **]**
 
 ### wsio_destroy
@@ -174,3 +176,4 @@ extern const IO_INTERFACE_DESCRIPTION* wsio_get_interface_description(void);
 ### on_ws_open_complete
 
 ### on_underlying_io_send_complete
+
