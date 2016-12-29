@@ -19,9 +19,10 @@ extern "C" {
 typedef struct WSIO_CONFIG_TAG
 {
     const char* hostname;
-    XIO_HANDLE underlying_io;
+    int port;
     const char* resource_name;
     const char* protocol;
+    bool use_ssl;
 } WSIO_CONFIG;
 
 extern CONCRETE_IO_HANDLE wsio_create(void* io_create_parameters);

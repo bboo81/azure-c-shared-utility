@@ -122,7 +122,9 @@ CONCRETE_IO_HANDLE wsio_create(void* io_create_parameters)
     WSIO_INSTANCE* result;
 
     if ((ws_io_config == NULL) ||
-        (ws_io_config->underlying_io == NULL))
+        (ws_io_config->hostname == NULL) ||
+        (ws_io_config->resource_name == NULL) ||
+        (ws_io_config->protocol == NULL))
     {
         result = NULL;
     }
@@ -141,7 +143,7 @@ CONCRETE_IO_HANDLE wsio_create(void* io_create_parameters)
             result->on_io_open_complete_context = NULL;
             result->on_io_error = NULL;
             result->on_io_error_context = NULL;
-            result->uws = uws_create_with_io(ws_io_config->underlying_io, ws_io_config->resource_name, &protocols, 1);
+            result->uws = uws_create(ws_io_config->hostname, ws_io_config->port, ws_io_config->resource_name, ws_io_config->use_ssl, &protocols, 1);
             if (result->uws == NULL)
             {
                 free(result);
